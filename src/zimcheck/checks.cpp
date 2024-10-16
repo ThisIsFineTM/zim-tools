@@ -196,7 +196,7 @@ void ErrorLogger::jsonOutput(const MsgIdWithParams& msg) const {
   jsonOutputStream << JSON::endObject;
 }
 
-void ErrorLogger::report(bool error_details) const {
+void ErrorLogger::report(bool /*error_details*/) const {
     if ( jsonOutputStream.enabled() ) {
         jsonOutputStream << JSON::property("logs", JSON::startArray);
         for ( size_t i = 0; i < size_t(TestType::COUNT); ++i ) {
@@ -322,7 +322,7 @@ private: // functions
 
     bool is_valid_internal_link(const std::string& link)
     {
-      return linkStatusCache.getOrPut(link, [=](){
+      return linkStatusCache.getOrPut(link, [this,link](){
                 return archive.hasEntryByPath(link);
       });
     }
@@ -405,23 +405,23 @@ void ArticleChecker::check_internal_links(zim::Item item, const LinkCollection& 
     int nremptylinks = 0;
     for (const auto &l : links)
     {
-        if (l.link.empty())
+        if (l.link().empty())
         {
             nremptylinks++;
             continue;
         }
-        if (l.link.front() == '#' || l.link.front() == '?') continue;
+        if (l.link().front() == '#' || l.link().front() == '?') continue;
         if (l.isInternalUrl() == false) continue;
 
 
-        if (isOutofBounds(l.link, baseUrl))
+        if (isOutofBounds(l.link(), baseUrl))
         {
-            reporter.addMsg(MsgId::OUTOFBOUNDS_LINK, {{"link", l.link}, {"path", path}});
+            reporter.addMsg(MsgId::OUTOFBOUNDS_LINK, {{"link", l.link()}, {"path", path}});
             continue;
         }
 
-        auto normalized = normalize_link(l.link, baseUrl);
-        groupedLinks[normalized].push_back(l.link);
+        auto normalized = normalize_link(l.link(), baseUrl);
+        groupedLinks[normalized].push_back(l.link());
     }
 
     if (nremptylinks)
@@ -453,9 +453,9 @@ void ArticleChecker::check_external_links(zim::Item item, const LinkCollection& 
     const auto path = item.getPath();
     for (const auto &l: links)
     {
-        if (l.attribute == "src" && l.isExternalUrl())
+        if (l.attribute() == "src" && l.isExternalUrl())
         {
-            reporter.addMsg(MsgId::EXTERNAL_LINK, {{"link", l.link}, {"path", path}});
+            reporter.addMsg(MsgId::EXTERNAL_LINK, {{"link", l.link()}, {"path", path}});
             break;
         }
     }

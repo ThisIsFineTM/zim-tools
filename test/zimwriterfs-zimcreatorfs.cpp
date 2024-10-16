@@ -160,7 +160,7 @@ TEST(ZimCreatorFSTest, ParseRedirect)
     EXPECT_THROW({
       parse_redirectArticles(
             ss,
-            [&](Redirect redirect)
+            [&](Redirect /*redirect*/)
              {}
           );
     }, std::runtime_error);
@@ -172,7 +172,7 @@ TEST(ZimCreatorFSTest, ParseRedirect)
       EXPECT_THROW({
         parse_redirectArticles(
               ss,
-              [&](Redirect redirect)
+              [&](Redirect /*redirect*/)
                {}
             );
       }, std::runtime_error);

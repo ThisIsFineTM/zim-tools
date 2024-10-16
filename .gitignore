@@ -29,6 +29,8 @@
 *.app
 
 # Temporary and test files
+*.~
+.cache/
 *.kate-swp
 .*.swp
 *.zim

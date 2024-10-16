@@ -200,7 +200,7 @@ void ZimCreatorFS::addFile(const std::string& path)
   addItem(item);
 }
 
-void ZimCreatorFS::processSymlink(const std::string& curdir, const std::string& symlink_path)
+void ZimCreatorFS::processSymlink(const std::string& /*curdir*/, const std::string& symlink_path)
 {
   /* #102 Links can be 3 different types:
    *  - dandling (not pointing to a valid file)

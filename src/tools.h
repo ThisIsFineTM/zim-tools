@@ -21,169 +21,196 @@
 #ifndef OPENZIM_TOOLS_H
 #define OPENZIM_TOOLS_H
 
-#include <map>
-#include <string>
-#include <vector>
-#include <stdexcept>
-#include <sstream>
-
+#include <zim/item.h>
 #include <zim/writer/contentProvider.h>
 #include <zim/writer/item.h>
-#include <zim/item.h>
+
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <vector>
 
 /* Formatter for std::exception what() message:
  * throw std::runtime_error(
- *   Formatter() << "zimwriterfs: Unable to read" << filename << ": " << strerror(errno));
+ *   Formatter() << "zimwriterfs: Unable to read" << filename << ": " <<
+ * strerror(errno));
  */
-class Formatter
+class Formatter final
 {
-public:
-    Formatter() {}
-    ~Formatter() {}
+ public:
+  Formatter() = default;
+  ~Formatter() = default;
 
-    template <typename Type>
-    Formatter & operator << (const Type & value)
-    {
-        stream_ << value;
-        return *this;
-    }
+  Formatter(const Formatter&) = delete;
+  Formatter(Formatter&&) noexcept = default;
 
-    // std::string str() const         { return stream_.str(); }
-    operator std::string () const   { return stream_.str(); }
+  Formatter& operator=(Formatter&) = delete;
+  Formatter& operator=(Formatter&&) noexcept = default;
 
-private:
-    Formatter(const Formatter &);
-    Formatter & operator = (Formatter &);
+  template <typename Type>
+  Formatter& operator<<(Type&& value)
+  {
+    stream_ << std::forward<Type>(value);
+    return *this;
+  }
 
-    std::stringstream stream_;
+  [[nodiscard]] operator std::string() const { return stream_.str(); }
+
+ private:
+  std::stringstream stream_;
 };
 
-enum class UriKind : int
-{
-    // Special URIs without authority that are valid in HTML
-    JAVASCRIPT,     // javascript:...
-    MAILTO,         // mailto:user@example.com
-    TEL,            // tel:+0123456789
-    SIP,            // sip:1-999-123-4567@voip-provider.example.net
-    GEO,            // geo:12.34,56.78
-    DATA,           // data:image/png;base64,...
-    XMPP,           // xmpp:kelson@kiwix.org
-    NEWS,           // news:comp.os.linux.announce
-    URN,            // urn:nbn:de:bsz:24-digibib-bsz3530416370
+enum class UriKind : int {
+  // Special URIs without authority that are valid in HTML
+  JAVASCRIPT,  // javascript:...
+  MAILTO,      // mailto:user@example.com
+  TEL,         // tel:+0123456789
+  SIP,         // sip:1-999-123-4567@voip-provider.example.net
+  GEO,         // geo:12.34,56.78
+  DATA,        // data:image/png;base64,...
+  XMPP,        // xmpp:kelson@kiwix.org
+  NEWS,        // news:comp.os.linux.announce
+  URN,         // urn:nbn:de:bsz:24-digibib-bsz3530416370
 
-    GENERIC_URI,    // Generic URI with scheme and authority: <scheme>://.....
-    PROTOCOL_RELATIVE, // Protocol-relative URL: //<host>/<path>/<to>/<resource>
+  GENERIC_URI,        // Generic URI with scheme and authority: <scheme>://.....
+  PROTOCOL_RELATIVE,  // Protocol-relative URL: //<host>/<path>/<to>/<resource>
 
-    OTHER           // not a valid URI (though it can be a valid relative
-                    // or absolute URL)
+  OTHER  // not a valid URI (though it can be a valid relative
+         // or absolute URL)
 };
 
-class html_link
+class html_link final
 {
-public:
-    const std::string attribute;
-    const std::string link;
-    const UriKind     uriKind;
+ public:
+  html_link() = delete;
+  ~html_link() = default;
 
-    html_link(const std::string& _attr, const std::string& _link)
-        : attribute(_attr)
-        , link(_link)
-        , uriKind(detectUriKind(_link))
-    {}
+  html_link(const std::string_view _attr, const std::string_view _link)
+      : attribute_(_attr), link_(_link), uriKind_(detectUriKind(_link))
+  {
+  }
 
-    bool isExternalUrl() const
-    {
-        return uriKind != UriKind::OTHER && uriKind != UriKind::DATA;
-    }
+  html_link(const html_link&) = default;
+  html_link(html_link&&) noexcept = default;
 
-    bool isInternalUrl() const
-    {
-        return uriKind == UriKind::OTHER;
-    }
+  html_link& operator=(const html_link&) = default;
+  html_link& operator=(html_link&&) noexcept = default;
 
-    static UriKind detectUriKind(const std::string& input_string);
+  [[nodiscard]]
+  constexpr bool isExternalUrl() const noexcept
+  {
+    return uriKind_ != UriKind::OTHER && uriKind_ != UriKind::DATA;
+  }
+
+  [[nodiscard]]
+  constexpr bool isInternalUrl() const noexcept
+  {
+    return uriKind_ == UriKind::OTHER;
+  }
+
+  [[nodiscard]]
+  static UriKind detectUriKind(const std::string_view input_string) noexcept;
+
+  [[nodiscard]]
+  constexpr const std::string& attribute() const noexcept
+  {
+    return attribute_;
+  }
+
+  [[nodiscard]]
+  constexpr const std::string& link() const noexcept
+  {
+    return link_;
+  }
+
+  [[nodiscard]]
+  constexpr UriKind uriKind() const noexcept
+  {
+    return uriKind_;
+  }
+
+ private:
+  std::string attribute_;
+  std::string link_;
+  UriKind uriKind_;
 };
 
 // Few helper class to help copy a item from a archive to another one.
 class ItemProvider : public zim::writer::ContentProvider
 {
-    zim::Item item;
-    bool feeded;
-  public:
-    ItemProvider(zim::Item item)
-      : item(item),
-        feeded(false)
-    {}
+ private:
+  zim::Item item;
+  bool feeded;
 
-    zim::size_type getSize() const {
-      return item.getSize();
-    }
+ public:
+  ItemProvider(zim::Item item) : item(item), feeded(false) {}
 
-    zim::Blob feed() {
-      if (feeded) {
-        return zim::Blob();
-      }
-      feeded = true;
-      return item.getData();
+  zim::size_type getSize() const { return item.getSize(); }
+
+  zim::Blob feed()
+  {
+    if (feeded) {
+      return zim::Blob();
     }
+    feeded = true;
+    return item.getData();
+  }
 };
 
 // Guess if the item is a front article.
 // This is not a exact science, we use the mimetype to infer it.
-bool guess_is_front_article(const std::string& mimetype);
+bool guess_is_front_article(std::string_view mimetype);
 
-
-class CopyItem : public zim::writer::Item         //Article class that will be passed to the zimwriter. Contains a zim::Article class, so it is easier to add a
+class CopyItem
+    : public zim::writer::Item  // Article class that will be passed to the
+                                // zimwriter. Contains a zim::Article class, so
+                                // it is easier to add a
 {
-    //article from an existing ZIM file.
-    zim::Item item;
+  // article from an existing ZIM file.
+  zim::Item item;
 
-  public:
-    explicit CopyItem(const zim::Item item):
-      item(item)
-    {}
+ public:
+  explicit CopyItem(const zim::Item item) : item(item) {}
 
-    virtual std::string getPath() const
-    {
-        return item.getPath();
-    }
+  virtual std::string getPath() const { return item.getPath(); }
 
-    virtual std::string getTitle() const
-    {
-        return item.getTitle();
-    }
+  virtual std::string getTitle() const { return item.getTitle(); }
 
-    virtual std::string getMimeType() const
-    {
-        return item.getMimetype();
-    }
+  virtual std::string getMimeType() const { return item.getMimetype(); }
 
-    std::unique_ptr<zim::writer::ContentProvider> getContentProvider() const
-    {
-       return std::unique_ptr<zim::writer::ContentProvider>(new ItemProvider(item));
-    }
+  std::unique_ptr<zim::writer::ContentProvider> getContentProvider() const
+  {
+    return std::unique_ptr<zim::writer::ContentProvider>(
+        new ItemProvider(item));
+  }
 
-    zim::writer::Hints getHints() const {
-      return { { zim::writer::HintKeys::FRONT_ARTICLE, guess_is_front_article(item.getMimetype()) } };
-    }
+  zim::writer::Hints getHints() const
+  {
+    return {{zim::writer::HintKeys::FRONT_ARTICLE,
+             guess_is_front_article(item.getMimetype())}};
+  }
 };
 
-std::string getMimeTypeForFile(const std::string& basedir, const std::string& filename);
+std::string getMimeTypeForFile(const std::string& basedir,
+                               const std::string& filename);
 std::string getFileContent(const std::string& path);
-std::string decodeUrl(const std::string& encodedUrl);
+std::string decodeUrl(std::string_view encodedUrl);
 
 // Assuming that basePath and targetPath are relative to the same location
 // returns the relative path of targetPath from basePath
-std::string computeRelativePath(const std::string& basePath,
-                                const std::string& targetPath);
+std::string computeRelativePath(std::string_view basePath,
+                                std::string_view targetPath);
 
-std::string computeAbsolutePath(const std::string& path,
-                                const std::string& relativePath);
-bool fileExists(const std::string& path);
-bool isDirectory(const std::string &path);
+std::string computeAbsolutePath(std::string_view path,
+                                std::string_view relativePath);
 
-std::string base64_encode(unsigned char const* bytes_to_encode,
-                          unsigned int in_len);
+[[nodiscard]]
+bool fileExists(const std::string_view path);
+
+[[nodiscard]]
+bool isDirectory(std::string_view path);
+
+std::string base64_encode(unsigned char const* bytes_to_encode, size_t in_len);
 
 void replaceStringInPlaceOnce(std::string& subject,
                               const std::string& search,
@@ -193,21 +220,25 @@ void replaceStringInPlace(std::string& subject,
                           const std::string& replace);
 void stripTitleInvalidChars(std::string& str);
 
-//Returns a vector of the links in a particular page. includes links under 'href' and 'src'
-std::vector<html_link> generic_getLinks(const std::string& page);
+// Returns a vector of the links in a particular page. includes links under
+// 'href' and 'src'
+std::vector<html_link> generic_getLinks(std::string_view page);
 
 // checks if a relative path is out of bounds (relative to base)
 bool isOutofBounds(const std::string& input, std::string base);
 
-//Adler32 Hash Function. Used to hash the BLOB data obtained from each article, for redundancy checks.
-//Please note that the adler32 hash function has a high number of collisions, and that the hash match is not taken as final.
-int adler32(const std::string& buf);
+// Adler32 Hash Function. Used to hash the BLOB data obtained from each article,
+// for redundancy checks. Please note that the adler32 hash function has a high
+// number of collisions, and that the hash match is not taken as final.
+// Adler32 is only used in an index elsewhere. Changing to unsigned.
+unsigned int adler32(std::string_view buf) noexcept;
 
-std::string decodeHtmlEntities(const std::string& str);
+std::string decodeHtmlEntities(std::string_view str);
 
-//Removes extra spaces from URLs. Usually done by the browser, so web authors sometimes tend to ignore it.
-//Converts the %20 to space.Essential for comparing URLs.
-std::string normalize_link(const std::string& input, const std::string& baseUrl);
+// Removes extra spaces from URLs. Usually done by the browser, so web authors
+// sometimes tend to ignore it. Converts the %20 to space.Essential for
+// comparing URLs.
+std::string normalize_link(std::string_view input, std::string_view baseUrl);
 
-std::string httpRedirectHtml(const std::string& redirectUrl);
-#endif  // OPENZIM_TOOLS_H
+std::string httpRedirectHtml(std::string_view redirectUrl);
+#endif  //  OPENZIM_TOOLS_H

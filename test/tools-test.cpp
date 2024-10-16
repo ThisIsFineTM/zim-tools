@@ -2,11 +2,20 @@
 
 #include "../src/tools.h"
 #include <magic.h>
+#include <filesystem>
 #include <unordered_map>
 
 magic_t magic;
 bool inflateHtmlFlag = false;
 bool isVerbose() { return false; }
+
+TEST(CommonTools, testDirectoryExists)
+{
+  namespace fs = std::filesystem;
+
+  ASSERT_TRUE(fs::exists(fs::path{"data/minimal-content"}));
+  ASSERT_TRUE(fs::exists(fs::path{            "data/minimal-content/favicon.png"}));
+}
 
 TEST(CommonTools, isDirectory)
 {
@@ -114,6 +123,8 @@ TEST(CommonTools, computeAbsolutePath)
   EXPECT_EQ(str, "../test/minimal-content/hello.html");
 
   // without trailing /  'data' component will be stripped from path:
+  // TODO: validate that this is really intended behavior / if there are any places
+  // which rely on this behavior.
   str = computeAbsolutePath("/home/alex/oz/zim-tools/test/data", "minimal-content/hello.html");
   EXPECT_EQ(str, "/home/alex/oz/zim-tools/test/minimal-content/hello.html");
 }
@@ -252,7 +263,7 @@ TEST(tools, normalize_link)
     ASSERT_EQ(normalize_link("/%41%62c", "/"), "Abc");
 }
 
-TEST(tools, addler32)
+TEST(tools, adler32)
 {
     ASSERT_EQ(adler32("sdfkhewruhwe8"), 640746832);
     ASSERT_EQ(adler32("sdifjsdf"), 251593550);
@@ -307,7 +318,7 @@ std::string links2Str(const std::vector<html_link>& links)
     std::ostringstream oss;
     const char* sep = "";
     for ( const auto& l : links ) {
-        oss << sep << "{ " << l.attribute << ", " << l.link << " }";
+        oss << sep << "{ " << l.attribute() << ", " << l.link() << " }";
         sep = "\n";
     }
     return oss.str();
@@ -419,7 +430,7 @@ TEST(tools, httpRedirectHtml)
     );
 
     EXPECT_EQ(
-      httpRedirectHtml(u8"A/Κίουι"),
+      httpRedirectHtml((const char*)u8"A/Κίουι"),
       "<!DOCTYPE html>"
       "<html>"
         "<head>"
