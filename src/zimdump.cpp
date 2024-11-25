@@ -17,32 +17,46 @@
  * MA 02110-1301, USA.
  */
 
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <sstream>
-#include <string_view>
-
 #define ZIM_PRIVATE
-#include <docopt/docopt.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <zim/archive.h>
-#include <zim/item.h>
+#include <zim-tools/tools.h>    // for computeRelativePath, httpRedirectHtml
+#include <zim-tools/version.h>  // for printVersions
+//
+#include <zim/archive.h>  // for Archive
+#include <zim/blob.h>     // for Blob, operator<<
+#include <zim/entry.h>    // for Entry
+#include <zim/item.h>     // for Item
+#include <zim/uuid.h>     // for operator<<
+#include <zim/zim.h>      // for size_type
+//
+#include <docopt/docopt.h>        // for docopt
+#include <docopt/docopt_value.h>  // for value
+//
+#include <fcntl.h>     // for open, O_CREAT, O_TRUNC, O_WRONLY
+#include <sys/stat.h>  // for S_IRGRP, S_IROTH, S_IRUSR, S_IWUSR
+//
+#include <cstddef>        // for size_t
+#include <exception>      // for exception
+#include <filesystem>     // for path, operator/, hash, operator<<
+#include <fstream>        // for basic_ostream, char_traits, operator<<
+#include <functional>     // for function
+#include <iostream>       // for cout, cerr
+#include <map>            // for map
+#include <sstream>        // for basic_ostringstream
+#include <stdexcept>      // for runtime_error
+#include <string>         // for basic_string, allocator, operator<<
+#include <string_view>    // for string_view, operator==, basic_string...
+#include <unordered_map>  // for unordered_map
+#include <unordered_set>  // for unordered_set, _Node_iterator
+#include <utility>        // for pair
+#include <vector>         // for vector
 
-#include <stdexcept>
-#include <unordered_set>
-
-#include "tools.h"
-#include "version.h"
 #ifdef _WIN32
 #include <io.h>
 #include <windows.h>
 constexpr std::string_view SEPARATOR{R"(\\)"};
 #else
 constexpr std::string_view SEPARATOR{R"(/)"};
-#include <unistd.h>
+#include <unistd.h>    // for close, symlink, write
 #endif
 
 constexpr std::string_view ERRORSDIR{R"(_exceptions/)"};
@@ -408,10 +422,10 @@ void ZimDumper::dumpFiles(std::string_view directory,
 #endif
       }
     } else {
-        zim::Blob blob = entry.getItem().getData();
-        write_to_file(fsDirectory.native(),
-                      relativePath.native(),
-                      std::string_view{blob.data(), blob.size()});
+      zim::Blob blob = entry.getItem().getData();
+      write_to_file(fsDirectory.native(),
+                    relativePath.native(),
+                    std::string_view{blob.data(), blob.size()});
     }
   }
 }
@@ -554,11 +568,7 @@ int main(int argc, char* argv[])
   std::ostringstream versions;
   printVersions(versions);
   Options args
-      = docopt::docopt(
-          USAGE,
-          {argv + 1, argv + argc},
-          true,
-          versions.str());
+      = docopt::docopt(USAGE, {argv + 1, argv + argc}, true, versions.str());
 
   try {
     ZimDumper app(args["<file>"].asString());

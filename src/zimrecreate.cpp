@@ -17,94 +17,101 @@
  * MA 02110-1301, USA.
  */
 
-#include <iostream>
-#include <sstream>
-#include <vector>
-#include <zim/writer/creator.h>
-#include <zim/blob.h>
-#include <zim/item.h>
-#include <zim/archive.h>
-#include <list>
-#include <algorithm>
-#include <sstream>
-
-#include "tools.h"
-#include "version.h"
+#include <zim-tools/tools.h>    // for guess_is_front_article, repl...
+#include <zim-tools/version.h>  // for printVersions
+//
+#include <zim/archive.h>                 // for Archive
+#include <zim/blob.h>                    // for Blob
+#include <zim/entry.h>                   // for Entry
+#include <zim/item.h>                    // for Item
+#include <zim/writer/contentProvider.h>  // for StringProvider, ContentProvider
+#include <zim/writer/creator.h>          // for Creator
+#include <zim/writer/item.h>             // for HintKeys, Hints, Item
+//
+#include <exception>         // for exception
+#include <initializer_list>  // for initializer_list
+#include <iostream>          // for basic_ostream, operator<<, endl
+#include <memory>            // for allocator, unique_ptr, share...
+#include <string>            // for basic_string, char_traits
+#include <utility>           // for move, pair
 
 /**
- * A PatchItem. This patch html and css content to remove the namespcae from the links.
+ * A PatchItem. This patch html and css content to remove the namespcae from the
+ * links.
  */
 class PatchItem : public zim::writer::Item
 {
-    //article from an existing ZIM file.
-    zim::Item item;
+  // article from an existing ZIM file.
+  zim::Item item;
 
-  public:
-    explicit PatchItem(const zim::Item item):
-      item(item)
-    {}
+ public:
+  explicit PatchItem(const zim::Item item) : item(item) {}
 
-    virtual std::string getPath() const
-    {
-      auto path = item.getPath();
-      if (path.length() > 2 && path[1] == '/') {
-        path = path.substr(2, std::string::npos);
+  virtual std::string getPath() const
+  {
+    auto path = item.getPath();
+    if (path.length() > 2 && path[1] == '/') {
+      path = path.substr(2, std::string::npos);
+    }
+    return path;
+  }
+
+  virtual std::string getTitle() const { return item.getTitle(); }
+
+  virtual std::string getMimeType() const { return item.getMimetype(); }
+
+  std::unique_ptr<zim::writer::ContentProvider> getContentProvider() const
+  {
+    auto mimetype = getMimeType();
+    if (mimetype.find("text/html") == std::string::npos
+        && mimetype.find("text/css") == std::string::npos) {
+      return std::unique_ptr<zim::writer::ContentProvider>(
+          new ItemProvider(item));
+    }
+
+    std::string content = item.getData();
+    // This is a really poor url rewriting to remove the starting "../<NS>/"
+    // and replace the "../../<NS/" by "../" :
+    // - Performance may be better
+    // - We only fix links in articles in "root" path (`foo.html`) and in one
+    // subdirectory (`bar/foo.hmtl`)
+    //   Deeper articles are not fixed (`bar/baz/foo.html`).
+    // - We may change content starting by `'../A/` even if they are not links
+    // - We don't handle links where we go upper in the middle of the link :
+    // `../foo/../I/image.png`
+    // - ...
+    // However, this should patch most of the links in our zim files.
+    for (std::string prefix : {"'", "\""}) {
+      for (auto ns : {'A', 'I', 'J', '-'}) {
+        replaceStringInPlace(
+            content, prefix + "../../" + ns + "/", prefix + "../");
+        replaceStringInPlace(content, prefix + "../" + ns + "/", prefix);
       }
-      return path;
     }
+    return std::unique_ptr<zim::writer::ContentProvider>(
+        new zim::writer::StringProvider(content));
+  }
 
-    virtual std::string getTitle() const
-    {
-        return item.getTitle();
-    }
-
-    virtual std::string getMimeType() const
-    {
-        return item.getMimetype();
-    }
-
-    std::unique_ptr<zim::writer::ContentProvider> getContentProvider() const
-    {
-        auto mimetype = getMimeType();
-        if ( mimetype.find("text/html") == std::string::npos
-          && mimetype.find("text/css") == std::string::npos) {
-            return std::unique_ptr<zim::writer::ContentProvider>(new ItemProvider(item));
-        }
-
-        std::string content = item.getData();
-        // This is a really poor url rewriting to remove the starting "../<NS>/"
-        // and replace the "../../<NS/" by "../" :
-        // - Performance may be better
-        // - We only fix links in articles in "root" path (`foo.html`) and in one subdirectory (`bar/foo.hmtl`)
-        //   Deeper articles are not fixed (`bar/baz/foo.html`).
-        // - We may change content starting by `'../A/` even if they are not links
-        // - We don't handle links where we go upper in the middle of the link : `../foo/../I/image.png`
-        // - ...
-        // However, this should patch most of the links in our zim files.
-        for (std::string prefix: {"'", "\""}) {
-          for (auto ns : {'A','I','J','-'}) {
-            replaceStringInPlace(content, prefix+"../../"+ns+"/", prefix+"../");
-            replaceStringInPlace(content, prefix+"../"+ns+"/", prefix);
-          }
-        }
-        return std::unique_ptr<zim::writer::ContentProvider>(new zim::writer::StringProvider(content));
-    }
-
-  zim::writer::Hints getHints() const {
-    return { { zim::writer::HintKeys::FRONT_ARTICLE, guess_is_front_article(item.getMimetype()) } };
+  zim::writer::Hints getHints() const
+  {
+    return {{zim::writer::HintKeys::FRONT_ARTICLE,
+             guess_is_front_article(item.getMimetype())}};
   }
 };
 
-
-void create(const std::string& originFilename, const std::string& outFilename, bool withFtIndexFlag, unsigned long nbThreads)
+void create(const std::string& originFilename,
+            const std::string& outFilename,
+            bool withFtIndexFlag,
+            unsigned long nbThreads)
 {
   zim::Archive origin(originFilename);
   zim::writer::Creator zimCreator;
-  zimCreator.configVerbose(true)
-            // [TODO] Use the correct language
-            .configIndexing(withFtIndexFlag, "eng")
-            .configClusterSize(2048*1024)
-            .configNbWorkers(nbThreads);
+  zimCreator
+      .configVerbose(true)
+      // [TODO] Use the correct language
+      .configIndexing(withFtIndexFlag, "eng")
+      .configClusterSize(2048 * 1024)
+      .configNbWorkers(nbThreads);
 
   std::cout << "starting zim creation" << std::endl;
   zimCreator.startZimCreation(outFilename);
@@ -117,32 +124,38 @@ void create(const std::string& originFilename, const std::string& outFilename, b
       mainPath = mainPath.substr(2, std::string::npos);
     }
     zimCreator.setMainPath(mainPath);
-  } catch(...) {}
+  } catch (...) {
+  }
 
   try {
     auto illustration = origin.getIllustrationItem();
     zimCreator.addIllustration(48, illustration.getData());
-  } catch(...) {}
+  } catch (...) {
+  }
 
-  for(auto& metakey:origin.getMetadataKeys()) {
+  for (auto& metakey : origin.getMetadataKeys()) {
     if (metakey == "Counter" || metakey.find("Illustration_") == 0) {
       // Counter is already added by libzim
       // Illustration is already handled by `addIllustration`
       continue;
     }
     auto metadata = origin.getMetadata(metakey);
-    auto metaProvider = std::unique_ptr<zim::writer::ContentProvider>(new zim::writer::StringProvider(metadata));
+    auto metaProvider = std::unique_ptr<zim::writer::ContentProvider>(
+        new zim::writer::StringProvider(metadata));
     zimCreator.addMetadata(metakey, std::move(metaProvider), "text/plain");
   }
 
-
-  for(auto& entry:origin.iterEfficient()) {
+  for (auto& entry : origin.iterEfficient()) {
     if (fromNewNamespace) {
-      //easy, just "copy" the item.
+      // easy, just "copy" the item.
       if (entry.isRedirect()) {
-        zimCreator.addRedirection(entry.getPath(), entry.getTitle(), entry.getRedirectEntry().getPath(), {{zim::writer::HintKeys::FRONT_ARTICLE, 1}});
+        zimCreator.addRedirection(entry.getPath(),
+                                  entry.getTitle(),
+                                  entry.getRedirectEntry().getPath(),
+                                  {{zim::writer::HintKeys::FRONT_ARTICLE, 1}});
       } else {
-        auto tmpItem = std::shared_ptr<zim::writer::Item>(new CopyItem(entry.getItem()));
+        auto tmpItem
+            = std::shared_ptr<zim::writer::Item>(new CopyItem(entry.getItem()));
         zimCreator.addItem(tmpItem);
       }
       continue;
@@ -162,97 +175,85 @@ void create(const std::string& originFilename, const std::string& outFilename, b
       redirectPath = redirectPath.substr(2, std::string::npos);
       zimCreator.addRedirection(path, entry.getTitle(), redirectPath);
     } else {
-      auto tmpItem = std::shared_ptr<zim::writer::Item>(new PatchItem(entry.getItem()));
+      auto tmpItem
+          = std::shared_ptr<zim::writer::Item>(new PatchItem(entry.getItem()));
       zimCreator.addItem(tmpItem);
     }
-
   }
   zimCreator.finishZimCreation();
 }
 
 void usage()
 {
-    std::cout << "\nzimrecreate recreates a ZIM file from a existing ZIM.\n"
-    "\nUsage: zimrecreate ORIGIN_FILE OUTPUT_FILE [Options]"
-    "\nOptions:\n"
-    "\t-v, --version           print software version\n"
-    "\t-j, --withoutFTIndex    don't create and add a fulltext index of the content to the ZIM\n"
-    "\t-J, --threads <number>  count of threads to utilize (default: 4)\n"
-    "\nReturn value:\n"
-    "- 0 if no error\n"
-    "- -1 if arguments are not valid\n"
-    "- -2 if zim creation fails\n";
-    return;
+  std::cout
+      << "\nzimrecreate recreates a ZIM file from a existing ZIM.\n"
+         "\nUsage: zimrecreate ORIGIN_FILE OUTPUT_FILE [Options]"
+         "\nOptions:\n"
+         "\t-v, --version           print software version\n"
+         "\t-j, --withoutFTIndex    don't create and add a fulltext index of "
+         "the content to the ZIM\n"
+         "\t-J, --threads <number>  count of threads to utilize (default: 4)\n"
+         "\nReturn value:\n"
+         "- 0 if no error\n"
+         "- -1 if arguments are not valid\n"
+         "- -2 if zim creation fails\n";
+  return;
 }
 
 int main(int argc, char* argv[])
 {
-    bool withFtIndexFlag = true;
-    unsigned long nbThreads = 4;
+  bool withFtIndexFlag = true;
+  unsigned long nbThreads = 4;
 
-    //Parsing arguments
-    //There will be only two arguments, so no detailed parsing is required.
-    for(int i=0;i<argc;i++)
-    {
-        if(std::string(argv[i])=="-H" ||
-           std::string(argv[i])=="--help" ||
-           std::string(argv[i])=="-h")
-        {
-            usage();
-            return 0;
-        }
-
-        if(std::string(argv[i])=="--version" ||
-           std::string(argv[i])=="-v")
-        {
-            printVersions();
-            return 0;
-        }
-
-        if(std::string(argv[i])=="--withoutFTIndex" ||
-           std::string(argv[i])=="-j")
-        {
-            withFtIndexFlag = false;
-        }
-
-        if(std::string(argv[i])=="-J" ||
-           std::string(argv[i])=="--threads")
-        {
-            if(argc<5)
-            {
-                std::cout << std::endl << "[ERROR] Not enough Arguments provided" << std::endl;
-                usage();
-                return -1;
-            }
-            try
-            {
-                nbThreads = std::stoul(argv[i+1]);
-            }
-            catch (...)
-            {
-                std::cerr << "The number of workers should be a number" << std::endl;
-                usage();
-                return -1;
-            }
-        }
+  // Parsing arguments
+  // There will be only two arguments, so no detailed parsing is required.
+  for (int i = 0; i < argc; i++) {
+    if (std::string(argv[i]) == "-H" || std::string(argv[i]) == "--help"
+        || std::string(argv[i]) == "-h") {
+      usage();
+      return 0;
     }
 
-    if(argc<3)
-    {
-        std::cout << std::endl << "[ERROR] Not enough Arguments provided" << std::endl;
+    if (std::string(argv[i]) == "--version" || std::string(argv[i]) == "-v") {
+      printVersions();
+      return 0;
+    }
+
+    if (std::string(argv[i]) == "--withoutFTIndex"
+        || std::string(argv[i]) == "-j") {
+      withFtIndexFlag = false;
+    }
+
+    if (std::string(argv[i]) == "-J" || std::string(argv[i]) == "--threads") {
+      if (argc < 5) {
+        std::cout << std::endl
+                  << "[ERROR] Not enough Arguments provided" << std::endl;
         usage();
         return -1;
+      }
+      try {
+        nbThreads = std::stoul(argv[i + 1]);
+      } catch (...) {
+        std::cerr << "The number of workers should be a number" << std::endl;
+        usage();
+        return -1;
+      }
     }
-    std::string originFilename = argv[1];
-    std::string outputFilename = argv[2];
-    try
-    {
-        create(originFilename, outputFilename, withFtIndexFlag, nbThreads);
-    }
-    catch (const std::exception& e)
-    {
-        std::cerr << e.what() << std::endl;
-        return -2;
-    }
-    return 0;
+  }
+
+  if (argc < 3) {
+    std::cout << std::endl
+              << "[ERROR] Not enough Arguments provided" << std::endl;
+    usage();
+    return -1;
+  }
+  std::string originFilename = argv[1];
+  std::string outputFilename = argv[2];
+  try {
+    create(originFilename, outputFilename, withFtIndexFlag, nbThreads);
+  } catch (const std::exception& e) {
+    std::cerr << e.what() << std::endl;
+    return -2;
+  }
+  return 0;
 }

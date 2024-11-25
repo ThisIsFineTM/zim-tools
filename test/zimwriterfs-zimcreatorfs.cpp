@@ -23,8 +23,8 @@
 
 #include "gtest/gtest.h"
 
-#include "../src/zimwriterfs/zimcreatorfs.h"
-#include "../src/tools.h"
+#include <zim-tools/zimwriterfs/zimcreatorfs.h>
+#include <zim-tools/tools.h>
 
 
 // stub from zimwriterfs.cpp

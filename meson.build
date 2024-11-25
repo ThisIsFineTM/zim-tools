@@ -86,5 +86,6 @@ if with_writer
 
 endif
 
+zim_tools_include_dir = include_directories('./include', is_system:false)
 subdir('src')
 subdir('test')

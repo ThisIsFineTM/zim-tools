@@ -1,8 +1,8 @@
 
 sources = [
   'zimwriterfs.cpp',
-  'tools.cpp',
   '../tools.cpp',
+  'tools.cpp',
   '../metadata.cpp',
   'zimcreatorfs.cpp'
 ]
@@ -11,5 +11,6 @@ deps = [thread_dep, libzim_dep, zlib_dep, gumbo_dep, magic_dep, icu_dep]
 
 zimwriterfs = executable('zimwriterfs',
                          sources,
+                         include_directories: zim_tools_include_dir,
                          dependencies : deps,
                          install : true)

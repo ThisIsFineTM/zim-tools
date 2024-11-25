@@ -17,22 +17,24 @@
  * MA 02110-1301, USA.
  */
 
-#include <iostream>
-#include <vector>
-#include <set>
-#include <chrono>
+#include <zim-tools/version.h>  // for printVersions
 
-#include <stdlib.h>
-#include <time.h>
+#include <zim/archive.h>        // for Archive
+#include <zim/blob.h>           // for Blob
+#include <zim/entry.h>          // for Entry
+#include <zim/item.h>           // for Item
 
-#include <zim/archive.h>
-#include <zim/entry.h>
-#include <zim/item.h>
-#include <zim/blob.h>
+#include <getopt.h>             // for getopt_long, option
+#include <unistd.h>             // for optarg, optind
 
-#include <getopt.h>
-
-#include "version.h"
+#include <chrono>     // for duration, operator-, steady_clock
+#include <cstdlib>    // for atoi, rand, srand
+#include <ctime>      // for time
+#include <exception>  // for exception
+#include <iostream>   // for basic_ostream, char_traits, operator<<
+#include <set>        // for _Rb_tree_const_iterator, operator==, set
+#include <string>     // for basic_string, operator<<, string, ope...
+#include <vector>     // for vector
 
 std::string randomUrl()
 {
@@ -44,13 +46,16 @@ std::string randomUrl()
 
 void displayHelp()
 {
-  std::cerr << "\nzimbench benchmarks a ZIM file reading speed.\n\n"
-    "usage: zimbench [options] zimfile\n"
-    "\t-n number\tnumber of linear accessed articles (default 1000)\n"
-    "\t-r number\tnumber of random accessed articles (default: same as -n)\n"
-    "\t-d number\tnumber of distinct articles used for random access (default: same as -r)\n\n"
-    "\t-v to print the software version\n"
-            << std::flush;
+  std::cerr
+      << "\nzimbench benchmarks a ZIM file reading speed.\n\n"
+         "usage: zimbench [options] zimfile\n"
+         "\t-n number\tnumber of linear accessed articles (default 1000)\n"
+         "\t-r number\tnumber of random accessed articles (default: same as "
+         "-n)\n"
+         "\t-d number\tnumber of distinct articles used for random access "
+         "(default: same as -r)\n\n"
+         "\t-v to print the software version\n"
+      << std::flush;
 }
 
 int main(int argc, char* argv[])
@@ -62,24 +67,20 @@ int main(int argc, char* argv[])
   unsigned int distinctCount = 1000;
   std::string filename;
 
-  static struct option long_options[] = {
-        { 0, 0, 0, 0}
-  };
+  static struct option long_options[] = {{0, 0, 0, 0}};
 
-  try
-  {
+  try {
     while (true) {
       int option_index = 0;
-      int c = getopt_long(argc, argv, "vn:r:d:",
-              long_options, &option_index);
+      int c = getopt_long(argc, argv, "vn:r:d:", long_options, &option_index);
 
-      if (c!= -1) {
+      if (c != -1) {
         switch (c) {
           case 'n':
             count = atoi(optarg);
-            if (! randomCountSet ) {
+            if (!randomCountSet) {
               randomCount = count;
-              if (! distinctCountSet ) {
+              if (!distinctCountSet) {
                 distinctCount = count;
               }
             }
@@ -87,7 +88,7 @@ int main(int argc, char* argv[])
           case 'r':
             randomCountSet = true;
             randomCount = atoi(optarg);
-            if (! distinctCountSet ) {
+            if (!distinctCountSet) {
               distinctCount = count;
             }
             break;
@@ -99,20 +100,19 @@ int main(int argc, char* argv[])
             printVersions();
             return 0;
           case '?':
-            std::cerr<<"Unknown option `" << argv[optind-1] << "'\n";
+            std::cerr << "Unknown option `" << argv[optind - 1] << "'\n";
             displayHelp();
             return 1;
         };
       } else {
-        if (optind < argc ) {
+        if (optind < argc) {
           filename = argv[optind++];
         }
         break;
       }
     }
 
-    if (filename.empty())
-    {
+    if (filename.empty()) {
       displayHelp();
       return 1;
     }
@@ -129,12 +129,12 @@ int main(int argc, char* argv[])
     RandomUrlsType randomUrls;
 
     std::cout << "collect linear urls" << std::endl;
-    for (auto& entry: archive.iterByPath())
-    {
+    for (auto& entry : archive.iterByPath()) {
       if (urls.size() >= count) {
         break;
       }
-      std::cout << "check url " << entry.getPath() << '\t' << urls.size() << " found" << std::endl;
+      std::cout << "check url " << entry.getPath() << '\t' << urls.size()
+                << " found" << std::endl;
       if (!entry.isRedirect())
         urls.insert(entry.getPath());
     }
@@ -142,8 +142,7 @@ int main(int argc, char* argv[])
     std::cout << urls.size() << " urls collected" << std::endl;
 
     std::cout << "collect random urls" << std::endl;
-    while (randomUrls.size() < distinctCount)
-    {
+    while (randomUrls.size() < distinctCount) {
       auto entry = archive.getEntryByPath(randomUrl());
       if (!entry.isRedirect())
         randomUrls.push_back(entry.getPath());
@@ -163,14 +162,16 @@ int main(int argc, char* argv[])
       try {
         auto entry = archive.getEntryByPath(*it);
         size += entry.getItem(true).getData().size();
-      } catch(...) {
+      } catch (...) {
         std::cerr << "Impossible to get article '" << *it << "'" << std::endl;
       }
     }
 
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> diff = end - start;
-    std::cout << "\tsize=" << size << "\tt=" << diff.count() << "s\t" << (static_cast<double>(urls.size()) / diff.count()) << " articles/s" << std::endl;
+    std::cout << "\tsize=" << size << "\tt=" << diff.count() << "s\t"
+              << (static_cast<double>(urls.size()) / diff.count())
+              << " articles/s" << std::endl;
 
     // reopen file
     archive = zim::Archive(filename);
@@ -183,19 +184,22 @@ int main(int argc, char* argv[])
     size = 0;
     for (unsigned r = 0; r < randomCount; ++r) {
       try {
-        auto entry = archive.getEntryByPath(randomUrls[rand() % randomUrls.size()]);
+        auto entry
+            = archive.getEntryByPath(randomUrls[rand() % randomUrls.size()]);
         size += entry.getItem(true).getData().size();
-      } catch(...) {}
+      } catch (...) {
+      }
     }
-    //for (UrlsType::const_iterator it = randomUrls.begin(); it != randomUrls.end(); ++it)
-      //size += file.getArticle(ns, *it).getData().size();
+    // for (UrlsType::const_iterator it = randomUrls.begin(); it !=
+    // randomUrls.end(); ++it) size += file.getArticle(ns,
+    // *it).getData().size();
 
     end = std::chrono::steady_clock::now();
     diff = end - start;
-    std::cout << "\tsize=" << size << "\tt=" << diff.count() << "s\t" << (static_cast<double>(randomCount) / diff.count()) << " articles/s" << std::endl;
-  }
-  catch (const std::exception& e)
-  {
+    std::cout << "\tsize=" << size << "\tt=" << diff.count() << "s\t"
+              << (static_cast<double>(randomCount) / diff.count())
+              << " articles/s" << std::endl;
+  } catch (const std::exception& e) {
     std::cerr << e.what() << std::endl;
   }
 }

@@ -20,9 +20,9 @@
 #ifndef _ZIM_JSON_TOOLS_H_
 #define _ZIM_JSON_TOOLS_H_
 
-#include <iostream>
-#include <stack>
-#include <cassert>
+#include <iostream>  // for basic_ostream, char_traits, operator<<, ostream
+#include <stack>     // for stack
+#include <string>    // for basic_string, operator<<, string
 
 namespace JSON
 {

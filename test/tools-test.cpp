@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
 
-#include "../src/tools.h"
+#include <zim-tools/tools.h>
 #include <magic.h>
 #include <filesystem>
 #include <unordered_map>

@@ -18,33 +18,30 @@
  * MA 02110-1301, USA.
  */
 
-#include "tools.h"
+#include <zim-tools/tools.h>
 
-#include <string.h>
-#include <sys/stat.h>
+#include <algorithm>    // for any_of, count, find, min, mismatch, transform
+#include <array>        // for array
+#include <cctype>       // for isxdigit, isalnum, tolower
+#include <cstdio>       // for sscanf
+#include <cstring>      // for strncmp
+#include <filesystem>   // for path, exists, is_directory, operator/
+#include <iomanip>      // for operator<<, setw
+#include <iterator>     // for back_insert_iterator, back_inserter, next
+#include <map>          // for map, operator==
+#include <optional>     // for optional, nullopt, nullopt_t
+#include <sstream>      // for basic_ostringstream, basic_ostream, basic_ist...
+#include <string_view>  // for string_view, basic_string_view, operator<=>
+#include <vector>       // for vector
 
-#include <algorithm>
-#include <array>
-#include <cerrno>
-#include <filesystem>
-#include <iomanip>
-#include <iostream>
-#include <iterator>
-#include <optional>
-#include <sstream>
-#include <type_traits>
-#include <vector>
+// #ifdef _WIN32
+////constexpr std::string_view SEPARATOR{R"(\\)"};
+// #else
+// #include <unistd.h>
+////constexpr std::string_view SEPARATOR{R"(/)"};
+// #endif
 
-#ifdef _WIN32
-constexpr std::string_view SEPARATOR{R"(\\)"};
-#else
-#include <unistd.h>
-constexpr std::string_view SEPARATOR{R"(/)"};
-#endif
-
-constexpr bool platformCharIsSigned = std::is_signed<char>::value;
-
-bool fileExists(const std::string_view path)
+bool fileExists(std::string_view path)
 {
   return std::filesystem::exists(std::filesystem::path{path});
 }
@@ -63,10 +60,13 @@ constexpr std::string_view base64_chars
 std::string base64_encode(unsigned char const* bytes_to_encode, size_t in_len)
 {
   std::string ret;
+  ret.reserve(in_len);
+
   size_t i = 0;
   size_t j = 0;
-  unsigned char char_array_3[3]{};
-  unsigned char char_array_4[4]{};
+
+  std::array<unsigned char, 3> char_array_3{};
+  std::array<unsigned char, 4> char_array_4{};
 
   while (in_len--) {
     char_array_3[i++] = *(bytes_to_encode++);
@@ -133,23 +133,6 @@ std::string decodeUrl(std::string_view originalUrl)
   }
   return url;
 }
-
-// static std::string removeLastPathElement(const std::string& path,
-//                                          const bool removePreSeparator,
-//                                          const bool removePostSeparator)
-//{
-//   std::string newPath = path;
-//   size_t offset = newPath.find_last_of(SEPARATOR);
-//
-//   if (removePreSeparator && offset == newPath.length() - 1) {
-//     newPath = newPath.substr(0, offset);
-//     offset = newPath.find_last_of(SEPARATOR);
-//   }
-//   newPath = removePostSeparator ? newPath.substr(0, offset)
-//                                 : newPath.substr(0, offset + 1);
-//
-//   return newPath;
-// }
 
 namespace
 {
@@ -222,55 +205,30 @@ std::string computeRelativePath(std::string_view basePath,
 std::string computeAbsolutePath(std::string_view path,
                                 std::string_view relativePath)
 {
-
   std::filesystem::path fsPath{path};
 
-  if(!path.empty() && path.back() != '/') {
+  if (!path.empty() && path.back() != '/') {
     fsPath = fsPath.parent_path();
   }
 
   auto absolutePath = fsPath / relativePath;
 
   return absolutePath.string();
-
-  // Remove leaf part of the path if not already a directory
-  // std::string absolutePath
-  //    = path.length() ? (path[path.length() - 1] == '/'
-  //                           ? path
-  //                           : removeLastPathElement(path, false, false))
-  //                    : path;
-
-  // Go through relative path
-  // std::vector<std::string> relativePathElements;
-  // std::stringstream relativePathStream(relativePath);
-  // std::string relativePathItem;
-
-  // while (std::getline(relativePathStream, relativePathItem, '/')) {
-  //   if (relativePathItem == "..") {
-  //     absolutePath = removeLastPathElement(absolutePath, true, false);
-  //   } else if (!relativePathItem.empty() && relativePathItem != ".") {
-  //     absolutePath += relativePathItem;
-  //     absolutePath += "/";
-  //   }
-  // }
-
-  ///* Remove wront trailing / */
-  // return absolutePath.substr(0, absolutePath.length() - 1);
 }
 
 void replaceStringInPlaceOnce(std::string& subject,
-                              const std::string& search,
-                              const std::string& replace)
+                              std::string_view search,
+                              std::string_view replace)
 {
-  size_t pos = subject.find(search, 0);
+  const size_t pos = subject.find(search, 0);
   if (pos != std::string::npos) {
     subject.replace(pos, search.length(), replace);
   }
 }
 
 void replaceStringInPlace(std::string& subject,
-                          const std::string& search,
-                          const std::string& replace)
+                          std::string_view search,
+                          std::string_view replace)
 {
   if (search.empty()) {
     return;
@@ -354,10 +312,10 @@ std::vector<html_link> generic_getLinks(std::string_view page)
   std::string attr;
 
   while (*p) {
-    if (strncmp(p, " href", 5) == 0) {
+    if (std::strncmp(p, " href", 5) == 0) {
       attr = "href";
       p += 5;
-    } else if (strncmp(p, " src", 4) == 0) {
+    } else if (std::strncmp(p, " src", 4) == 0) {
       attr = "src";
       p += 4;
     } else {
@@ -385,20 +343,20 @@ std::vector<html_link> generic_getLinks(std::string_view page)
     while (*p != delimiter) {
       p++;
     }
-    const std::string link(linkStart, p);
+    std::string link(linkStart, p);
     links.push_back(html_link(attr, decodeHtmlEntities(link)));
     p += 1;
   }
   return links;
 }
 
-bool isOutofBounds(const std::string& input, std::string base)
+bool isOutofBounds(std::string_view input, std::string base)
 {
   if (input.empty()) {
     return false;
   }
 
-  if (!base.length() || base.back() != '/') {
+  if (base.empty() || base.back() != '/') {
     base.push_back('/');
   }
 
@@ -409,7 +367,7 @@ bool isOutofBounds(const std::string& input, std::string base)
 
   // count nr of substrings ../
   int nrsteps = 0;
-  std::string::size_type pos = 0;
+  std::string_view::size_type pos = 0;
   while ((pos = input.find("../", pos)) != std::string::npos) {
     nrsteps++;
     pos += 3;
@@ -453,12 +411,13 @@ std::string normalize_link(const std::string_view input,
     check_rel = true;
   }
 
-  constexpr static std::string_view upPrefix{"../"};
+  constexpr static std::string_view parentPrefix{"../"};
+  constexpr static std::string_view currentPrefix{"./"};
 
   // URL Decoding.
   while (p < input.cend()) {
     if (check_rel) {
-      if (strncmp(p, "../", 3) == 0) {
+      if (std::strncmp(p, parentPrefix.data(), parentPrefix.size()) == 0) {
         // We must go "up"
         // Remove the '/' at the end of output.
         output.resize(output.size() - 1);
@@ -472,7 +431,7 @@ std::string normalize_link(const std::string_view input,
         check_rel = false;
         continue;
       }
-      if (strncmp(p, "./", 2) == 0) {
+      if (std::strncmp(p, currentPrefix.data(), currentPrefix.size()) == 0) {
         // We must simply skip this part
         // Simply move after the ".".
         p += 2;
@@ -537,7 +496,7 @@ UriKind html_link::detectUriKind(std::string_view input_string) noexcept
 {
   const size_t k = input_string.find_first_of(uriDelimiters);
 
-  if (k == std::string::npos || input_string[k] != ':') {
+  if (k == std::string_view::npos || input_string[k] != ':') {
     if (k == 0 && input_string.size() > 1
         && input_string.substr(0, 2) == uriProtocolRelativeDelimeter) {
       return UriKind::PROTOCOL_RELATIVE;
@@ -628,6 +587,9 @@ std::string httpRedirectHtml(std::string_view redirectUrl)
 
 bool guess_is_front_article(std::string_view mimetype)
 {
-  return (mimetype.find("text/html") == 0
-          && mimetype.find("raw=true") == std::string::npos);
+  constexpr static std::string_view mimeTextHtml{"text/html"};
+  constexpr static std::string_view mimeRawTrue{"raw=true"};
+
+  return (mimetype.find(mimeTextHtml) == 0
+          && mimetype.find(mimeRawTrue) == std::string_view::npos);
 }

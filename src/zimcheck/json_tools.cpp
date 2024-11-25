@@ -17,19 +17,18 @@
  * MA 02110-1301, USA.
  */
 
-#include "json_tools.h"
+#include <zim-tools/zimcheck/json_tools.h>
+//
+#include <cassert>  // for assert
 
 namespace JSON
 {
 
-OutputStream::OutputStream(std::ostream* out)
-  : m_out(out)
-{
-}
+OutputStream::OutputStream(std::ostream* out) : m_out(out) {}
 
 const char* OutputStream::sep() const
 {
-  if ( m_nesting.empty() )
+  if (m_nesting.empty())
     return "";
 
   return m_nesting.top().hasData ? ",\n" : "";
@@ -37,7 +36,7 @@ const char* OutputStream::sep() const
 
 std::string OutputStream::indentation() const
 {
-  return std::string(2*m_nesting.size(), ' ');
+  return std::string(2 * m_nesting.size(), ' ');
 }
 
 void OutputStream::output(bool b)
@@ -54,7 +53,7 @@ void OutputStream::output(const char* s)
   for (const char* p = s; *p; ++p) {
     if (*p == '\"' || *p == '\\') {
       out << '\\' << *p;
-    } else if ( *p == '\n' ) {
+    } else if (*p == '\n') {
       out << "\\n";
     } else {
       out << *p;
@@ -65,7 +64,7 @@ void OutputStream::output(const char* s)
 
 void OutputStream::output(StartObject)
 {
-  if ( m_out ) {
+  if (m_out) {
     *m_out << "{\n" << std::flush;
   }
   m_nesting.push(ScopeInfo{OBJECT, false});
@@ -76,10 +75,10 @@ void OutputStream::output(EndObject)
   assert(!m_nesting.empty());
   assert(m_nesting.top().type == OBJECT);
   m_nesting.pop();
-  if ( m_out ) {
+  if (m_out) {
     *m_out << "\n" << indentation() << "}" << std::flush;
   }
-  if ( !m_nesting.empty() ) {
+  if (!m_nesting.empty()) {
     m_nesting.top().hasData = true;
   } else {
     *m_out << std::endl;
@@ -88,7 +87,7 @@ void OutputStream::output(EndObject)
 
 void OutputStream::output(StartArray)
 {
-  if ( m_out ) {
+  if (m_out) {
     *m_out << "[\n" << std::flush;
   }
   m_nesting.push(ScopeInfo{ARRAY, false});
@@ -100,13 +99,13 @@ OutputStream& OutputStream::operator<<(EndArray)
   assert(m_nesting.top().type == ARRAY);
   const char* s = m_nesting.top().hasData ? "\n" : "";
   m_nesting.pop();
-  if ( m_out ) {
+  if (m_out) {
     *m_out << s << indentation() << "]" << std::flush;
   }
-  if ( !m_nesting.empty() ) {
+  if (!m_nesting.empty()) {
     m_nesting.top().hasData = true;
   }
   return *this;
 }
 
-} // namespace JSON
+}  // namespace JSON

@@ -30,6 +30,9 @@
 
 # Temporary and test files
 *.~
+*~
+*.tmp
+*.swp
 .cache/
 *.kate-swp
 .*.swp

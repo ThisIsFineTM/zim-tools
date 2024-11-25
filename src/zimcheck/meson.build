@@ -15,6 +15,10 @@ else
   thread_dep = dependency('', required:false)
 endif
 
+zimcheck_include_directories = []
+zimcheck_include_directories += zim_tools_include_dir
+zimcheck_include_directories += inc
+
 executable('zimcheck',
   'main.cpp',
   'zimcheck.cpp',
@@ -22,7 +26,7 @@ executable('zimcheck',
   'json_tools.cpp',
   '../tools.cpp',
   '../metadata.cpp',
-  include_directories : inc,
+  include_directories: zimcheck_include_directories,
   dependencies: [libzim_dep, icu_dep, thread_dep, docopt_dep],
   install: true)
 

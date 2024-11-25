@@ -21,11 +21,22 @@
 #ifndef OPENZIM_ZIMWRITERFS_TOOLS_H
 #define OPENZIM_ZIMWRITERFS_TOOLS_H
 
-#include <gumbo.h>
-#include <string>
+#include <gumbo.h>  // for GumboVector
 
-std::string extractRedirectUrlFromHtml(const GumboVector* head_children);
+#include <string>       // for string
+#include <string_view>  // for string_view
 
+[[nodiscard]]
+std::string extractRedirectUrlFromHtml(const ::GumboVector* head_children);
+
+[[nodiscard]]
 std::string generateDate();
 
-#endif  // OPENZIM_ZIMWRITERFS_TOOLS_H
+[[nodiscard]]
+std::string getMimeTypeForFile(std::string_view basedir,
+                               std::string_view filename);
+
+[[nodiscard]]
+std::string getFileContent(const std::string& path);
+
+#endif  //  OPENZIM_ZIMWRITERFS_TOOLS_H

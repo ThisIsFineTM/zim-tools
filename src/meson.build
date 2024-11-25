@@ -2,6 +2,7 @@
 if with_xapian_support
   executable('zimsearch', 'zimsearch.cpp',
     dependencies: libzim_dep,
+    include_directories: zim_tools_include_dir, 
     install: true)
 else
   message('Libzim seems to be compiled without xapian support.\nzimsearch will not be compiled.')
@@ -11,27 +12,33 @@ endif
 if target_machine.system() != 'windows'
   executable('zimbench', 'zimbench.cpp',
     dependencies: [libzim_dep, rt_dep],
+    include_directories: zim_tools_include_dir, 
     install: true)
 endif
 
 executable('zimdump', 'zimdump.cpp', 'tools.cpp',
   dependencies: [libzim_dep, docopt_dep],
+  include_directories: zim_tools_include_dir, 
   install: true)
 
 executable('zimdiff', ['zimdiff.cpp', 'tools.cpp'],
   dependencies: libzim_dep,
+  include_directories: zim_tools_include_dir, 
   install: true)
 
 executable('zimpatch', ['zimpatch.cpp', 'tools.cpp'],
   dependencies: libzim_dep,
+  include_directories: zim_tools_include_dir, 
   install: true)
 
 executable('zimsplit', 'zimsplit.cpp',
   dependencies: [libzim_dep, docopt_dep],
+  include_directories: zim_tools_include_dir, 
   install: true)
 
 executable('zimrecreate', ['zimrecreate.cpp', 'tools.cpp'],
   dependencies: libzim_dep,
+  include_directories: zim_tools_include_dir, 
   install: true)
 
 subdir('zimcheck')

@@ -1,4 +1,4 @@
-#include "../src/metadata.h"
+#include <zim-tools/metadata.h>
 
 #include "gtest/gtest.h"
 

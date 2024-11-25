@@ -18,9 +18,9 @@
  * MA 02110-1301, USA.
  */
 
-#include "zimcreatorfs.h"
-#include "../tools.h"
-#include "tools.h"
+#include <zim-tools/zimwriterfs/zimcreatorfs.h>
+#include <zim-tools/tools.h>
+#include <zim-tools/zimwriterfs/tools.h>
 
 #include <fstream>
 #include <dirent.h>

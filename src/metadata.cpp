@@ -17,15 +17,19 @@
  * MA 02110-1301, USA.
  */
 
-#include "metadata.h"
-
-#include <sstream>
-#include <regex>
-#include <unicode/unistr.h>
-
-#include <cctype>
-#include <iomanip>
-
+#include <zim-tools/metadata.h>
+//
+#include <unicode/stringpiece.h>  // for StringPiece
+#include <unicode/unistr.h>       // for UnicodeString
+#include <unicode/uversion.h>     // for icu
+//
+#include <cctype>     // for isprint
+#include <cstdint>    // for int32_t
+#include <iomanip>    // for operator<<, setfill, setw
+#include <regex>      // for regex_search, regex
+#include <sstream>    // for basic_ostringstream, basic_ostream
+#include <stdexcept>  // for out_of_range
+#include <utility>    // for pair
 
 namespace zim
 {
@@ -34,7 +38,7 @@ namespace
 {
 
 const bool MANDATORY = true;
-const bool OPTIONAL  = false;
+const bool OPTIONAL = false;
 
 const std::string LANGS_REGEXP = "^\\w{3}(,\\w{3})*$";
 const std::string DATE_REGEXP = R"(^\d\d\d\d-\d\d-\d\d$)";
@@ -48,30 +52,31 @@ bool searchRegex(const std::string& regexStr, const std::string& text)
 
 size_t getTextLength(const std::string& utf8EncodedString)
 {
-  // For some unknown reason implicite convertion from std::string to icu::StringPiece
-  // is broken on Windows.
-  // Constructors are definde in stringpiece.h as
+  // For some unknown reason implicite convertion from std::string to
+  // icu::StringPiece is broken on Windows. Constructors are definde in
+  // stringpiece.h as
   // ```
   // StringPiece(const std::string& str)
   //  : ptr_(str.data()), length_(static_cast<int32_t>(str.size())) { }
-  // StringPiece(const char* offset, int32_t len) : ptr_(offset), length_(len) { }
+  // StringPiece(const char* offset, int32_t len) : ptr_(offset), length_(len) {
+  // }
   // ```
-  // However using the first constructor ends with a corrupted StringPiece (wrong ptr)
-  // and using second one works. Don't ask me why
-  // This is broken
+  // However using the first constructor ends with a corrupted StringPiece
+  // (wrong ptr) and using second one works. Don't ask me why This is broken
   // icu::StringPiece stringPiece(utf8EncodedString);
   // This is not
-  icu::StringPiece stringPiece(utf8EncodedString.data(), static_cast<int32_t>(utf8EncodedString.size()));
+  icu::StringPiece stringPiece(utf8EncodedString.data(),
+                               static_cast<int32_t>(utf8EncodedString.size()));
   return icu::UnicodeString::fromUTF8(stringPiece).length();
 }
 
 class MetadataComplexCheckBase
 {
-public:
+ public:
   const std::string description;
   const MetadataComplexCheckBase* const prev;
 
-public: // functions
+ public:  // functions
   explicit MetadataComplexCheckBase(const std::string& desc);
 
   MetadataComplexCheckBase(const MetadataComplexCheckBase&) = delete;
@@ -85,15 +90,14 @@ public: // functions
 
   static const MetadataComplexCheckBase* getLastCheck() { return last; }
 
-private: // functions
+ private:  // functions
   static const MetadataComplexCheckBase* last;
 };
 
 const MetadataComplexCheckBase* MetadataComplexCheckBase::last = nullptr;
 
 MetadataComplexCheckBase::MetadataComplexCheckBase(const std::string& desc)
-  : description(desc)
-  , prev(last)
+    : description(desc), prev(last)
 {
   last = this;
 }
@@ -107,26 +111,24 @@ MetadataComplexCheckBase::~MetadataComplexCheckBase()
   // has been destroyed as part of program termination clean-up actions.
 }
 
-#define ADD_METADATA_COMPLEX_CHECK(DESC, CLSNAME)              \
-class CLSNAME : public MetadataComplexCheckBase                \
-{                                                              \
-public:                                                        \
-  CLSNAME() : MetadataComplexCheckBase(DESC) {}                \
-  bool checkMetadata(const Metadata& data) const override;     \
-};                                                             \
-                                                               \
-const CLSNAME CONCAT(obj, CLSNAME);                            \
-                                                               \
-bool CLSNAME::checkMetadata(const Metadata& data) const        \
-/* should be followed by the check body */
-
-
+#define ADD_METADATA_COMPLEX_CHECK(DESC, CLSNAME)            \
+  class CLSNAME : public MetadataComplexCheckBase            \
+  {                                                          \
+   public:                                                   \
+    CLSNAME() : MetadataComplexCheckBase(DESC) {}            \
+    bool checkMetadata(const Metadata& data) const override; \
+  };                                                         \
+                                                             \
+  const CLSNAME CONCAT(obj, CLSNAME);                        \
+                                                             \
+  bool CLSNAME::checkMetadata(const Metadata& data)          \
+      const /* should be followed by the check body */
 
 #define CONCAT(X, Y) X##Y
 #define GENCLSNAME(UUID) CONCAT(MetadataComplexCheck, UUID)
 
-#define METADATA_ASSERT(DESC) ADD_METADATA_COMPLEX_CHECK(DESC, GENCLSNAME(__LINE__))
-
+#define METADATA_ASSERT(DESC) \
+  ADD_METADATA_COMPLEX_CHECK(DESC, GENCLSNAME(__LINE__))
 
 #include "metadata_constraints.cpp"
 
@@ -155,15 +157,16 @@ Metadata::Errors concat(Metadata::Errors e1, const Metadata::Errors& e2)
   return e1;
 }
 
-} // unnamed namespace
+}  // unnamed namespace
 
-const Metadata::ReservedMetadataTable& Metadata::reservedMetadataInfo = reservedMetadataInfoTable;
+const Metadata::ReservedMetadataTable& Metadata::reservedMetadataInfo
+    = reservedMetadataInfoTable;
 
-const Metadata::ReservedMetadataRecord&
-Metadata::getReservedMetadataRecord(const std::string& name)
+const Metadata::ReservedMetadataRecord& Metadata::getReservedMetadataRecord(
+    const std::string& name)
 {
-  for ( const auto& x : reservedMetadataInfo ) {
-    if ( x.name == name )
+  for (const auto& x : reservedMetadataInfo) {
+    if (x.name == name)
       return x;
   }
 
@@ -193,9 +196,9 @@ bool Metadata::valid() const
 Metadata::Errors Metadata::checkMandatoryMetadata() const
 {
   Errors errors;
-  for ( const auto& rmr : reservedMetadataInfo ) {
-    if ( rmr.isMandatory && data.find(rmr.name) == data.end() ) {
-      errors.push_back("Missing mandatory metadata: " + rmr.name );
+  for (const auto& rmr : reservedMetadataInfo) {
+    if (rmr.isMandatory && data.find(rmr.name) == data.end()) {
+      errors.push_back("Missing mandatory metadata: " + rmr.name);
     }
   }
 
@@ -205,26 +208,28 @@ Metadata::Errors Metadata::checkMandatoryMetadata() const
 Metadata::Errors Metadata::checkSimpleConstraints() const
 {
   Errors errors;
-  for ( const auto& nv : data ) {
+  for (const auto& nv : data) {
     const auto& name = nv.first;
     const auto& value = nv.second;
     try {
       const auto& rmr = getReservedMetadataRecord(name);
-      if ( rmr.minLength != 0 && getTextLength(value) < rmr.minLength ) {
+      if (rmr.minLength != 0 && getTextLength(value) < rmr.minLength) {
         std::ostringstream oss;
-        oss << name << " must contain at least " << rmr.minLength << " characters";
+        oss << name << " must contain at least " << rmr.minLength
+            << " characters";
         errors.push_back(oss.str());
       }
-      if ( rmr.maxLength != 0 && getTextLength(value) > rmr.maxLength ) {
+      if (rmr.maxLength != 0 && getTextLength(value) > rmr.maxLength) {
         std::ostringstream oss;
-        oss << name << " must contain at most " << rmr.maxLength << " characters";
+        oss << name << " must contain at most " << rmr.maxLength
+            << " characters";
         errors.push_back(oss.str());
       }
-      if ( !rmr.regex.empty() && !searchRegex(rmr.regex, value) ) {
+      if (!rmr.regex.empty() && !searchRegex(rmr.regex, value)) {
         const std::string regex = escapeNonPrintableChars(rmr.regex);
         errors.push_back(name + " doesn't match regex: " + regex);
       }
-    } catch ( const std::out_of_range& ) {
+    } catch (const std::out_of_range&) {
       // ignore non-reserved metadata
     }
   }
@@ -235,8 +240,8 @@ Metadata::Errors Metadata::checkComplexConstraints() const
 {
   Errors errors;
   const MetadataComplexCheckBase* c = MetadataComplexCheckBase::getLastCheck();
-  for ( ; c != nullptr ; c = c->prev ) {
-    if ( ! c->checkMetadata(*this) ) {
+  for (; c != nullptr; c = c->prev) {
+    if (!c->checkMetadata(*this)) {
       errors.push_back(c->description);
     }
   }
@@ -247,10 +252,10 @@ Metadata::Errors Metadata::check() const
 {
   const Errors e1 = checkMandatoryMetadata();
   const Errors e2 = checkSimpleConstraints();
-  if ( !e1.empty() || !e2.empty() )
+  if (!e1.empty() || !e2.empty())
     return concat(e1, e2);
 
   return checkComplexConstraints();
 }
 
-} // namespace zim
+}  // namespace zim

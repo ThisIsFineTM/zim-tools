@@ -20,9 +20,10 @@
 #ifndef OPENZIM_METADATA_H
 #define OPENZIM_METADATA_H
 
-#include <string>
-#include <vector>
-#include <map>
+#include <cstddef>  // for size_t
+#include <map>      // for map
+#include <string>   // for basic_string, string, operator<=>
+#include <vector>   // for vector
 
 namespace zim
 {
@@ -31,13 +32,12 @@ class Metadata
 {
   typedef std::map<std::string, std::string> KeyValueMap;
 
-public: // types
-  struct ReservedMetadataRecord
-  {
+ public:  // types
+  struct ReservedMetadataRecord {
     const std::string name;
-    const bool        isMandatory;
-    const size_t      minLength;
-    const size_t      maxLength;
+    const bool isMandatory;
+    const size_t minLength;
+    const size_t maxLength;
     const std::string regex;
   };
 
@@ -47,10 +47,10 @@ public: // types
 
   typedef KeyValueMap::const_iterator Iterator;
 
-public: // data
+ public:  // data
   static const ReservedMetadataTable& reservedMetadataInfo;
 
-public: // functions
+ public:  // functions
   void set(const std::string& name, const std::string& value);
   bool has(const std::string& name) const;
   const std::string& operator[](const std::string& name) const;
@@ -58,20 +58,21 @@ public: // functions
   bool valid() const;
   Errors check() const;
 
-  static const ReservedMetadataRecord& getReservedMetadataRecord(const std::string& name);
+  static const ReservedMetadataRecord& getReservedMetadataRecord(
+      const std::string& name);
 
   Iterator begin() const { return data.begin(); }
-  Iterator end()   const { return data.end(); }
+  Iterator end() const { return data.end(); }
 
-private: // functions
+ private:  // functions
   Errors checkMandatoryMetadata() const;
   Errors checkSimpleConstraints() const;
   Errors checkComplexConstraints() const;
 
-private: // data
+ private:  // data
   KeyValueMap data;
 };
 
-} // namespace zim
+}  // namespace zim
 
-#endif  // OPENZIM_METADATA_H
+#endif  //  OPENZIM_METADATA_H

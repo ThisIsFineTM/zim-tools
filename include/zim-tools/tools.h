@@ -21,14 +21,19 @@
 #ifndef OPENZIM_TOOLS_H
 #define OPENZIM_TOOLS_H
 
-#include <zim/item.h>
-#include <zim/writer/contentProvider.h>
-#include <zim/writer/item.h>
+#include <zim/blob.h>                    // for Blob
+#include <zim/item.h>                    // for Item
+#include <zim/writer/contentProvider.h>  // for ContentProvider
+#include <zim/writer/item.h>             // for HintKeys, Item, Hints
+#include <zim/zim.h>                     // for size_type
 
-#include <sstream>
-#include <string>
-#include <string_view>
-#include <vector>
+#include <cstddef>      // for size_t
+#include <memory>       // for unique_ptr, make_unique
+#include <sstream>      // for basic_stringstream, char_traits
+#include <string>       // for basic_string, string
+#include <string_view>  // for string_view
+#include <utility>      // for move, forward, pair
+#include <vector>       // for vector
 
 /* Formatter for std::exception what() message:
  * throw std::runtime_error(
@@ -85,8 +90,8 @@ class html_link final
   html_link() = delete;
   ~html_link() = default;
 
-  html_link(const std::string_view _attr, const std::string_view _link)
-      : attribute_(_attr), link_(_link), uriKind_(detectUriKind(_link))
+  html_link(std::string_view attr, std::string_view link)
+      : attribute_(attr), link_(link), uriKind_(detectUriKind(link))
   {
   }
 
@@ -109,16 +114,16 @@ class html_link final
   }
 
   [[nodiscard]]
-  static UriKind detectUriKind(const std::string_view input_string) noexcept;
+  static UriKind detectUriKind(std::string_view input_string) noexcept;
 
   [[nodiscard]]
-  constexpr const std::string& attribute() const noexcept
+  constexpr std::string_view attribute() const noexcept
   {
     return attribute_;
   }
 
   [[nodiscard]]
-  constexpr const std::string& link() const noexcept
+  constexpr std::string_view link() const noexcept
   {
     return link_;
   }
@@ -139,15 +144,34 @@ class html_link final
 class ItemProvider : public zim::writer::ContentProvider
 {
  private:
+  using Parent_t = zim::writer::ContentProvider;
+
   zim::Item item;
-  bool feeded;
+  bool feeded{};
 
  public:
-  ItemProvider(zim::Item item) : item(item), feeded(false) {}
+  ItemProvider() = delete;
+  ~ItemProvider() override = default;
 
-  zim::size_type getSize() const { return item.getSize(); }
+  ItemProvider(const ItemProvider&) = default;
+  ItemProvider(ItemProvider&&) noexcept = default;
 
-  zim::Blob feed()
+  ItemProvider(zim::Item item)
+      : Parent_t(), item(std::move(item)), feeded(false)
+  {
+  }
+
+  ItemProvider& operator=(const ItemProvider&) = default;
+  ItemProvider& operator=(ItemProvider&&) noexcept = default;
+
+  [[nodiscard]]
+  zim::size_type getSize() const override
+  {
+    return item.getSize();
+  }
+
+  [[nodiscard]]
+  zim::Blob feed() override
   {
     if (feeded) {
       return zim::Blob();
@@ -159,6 +183,7 @@ class ItemProvider : public zim::writer::ContentProvider
 
 // Guess if the item is a front article.
 // This is not a exact science, we use the mimetype to infer it.
+[[nodiscard]]
 bool guess_is_front_article(std::string_view mimetype);
 
 class CopyItem
@@ -166,79 +191,113 @@ class CopyItem
                                 // zimwriter. Contains a zim::Article class, so
                                 // it is easier to add a
 {
+  using Parent_t = zim::writer::Item;
+
   // article from an existing ZIM file.
   zim::Item item;
 
  public:
-  explicit CopyItem(const zim::Item item) : item(item) {}
+  CopyItem() = delete;
+  ~CopyItem() override = default;
 
-  virtual std::string getPath() const { return item.getPath(); }
+  CopyItem(const CopyItem&) = default;
+  CopyItem(CopyItem&&) noexcept = default;
+  explicit CopyItem(const zim::Item& item) : Parent_t(), item(item) {}
 
-  virtual std::string getTitle() const { return item.getTitle(); }
+  CopyItem& operator=(const CopyItem&) = default;
+  CopyItem& operator=(CopyItem&&) noexcept = default;
 
-  virtual std::string getMimeType() const { return item.getMimetype(); }
-
-  std::unique_ptr<zim::writer::ContentProvider> getContentProvider() const
+  [[nodiscard]]
+  std::string getPath() const override
   {
-    return std::unique_ptr<zim::writer::ContentProvider>(
-        new ItemProvider(item));
+    return item.getPath();
   }
 
-  zim::writer::Hints getHints() const
+  [[nodiscard]]
+  std::string getTitle() const override
+  {
+    return item.getTitle();
+  }
+
+  [[nodiscard]]
+  std::string getMimeType() const override
+  {
+    return item.getMimetype();
+  }
+
+  [[nodiscard]]
+  std::unique_ptr<zim::writer::ContentProvider> getContentProvider()
+      const override
+  {
+    return std::make_unique<ItemProvider>(item);
+  }
+
+  [[nodiscard]]
+  zim::writer::Hints getHints() const override
   {
     return {{zim::writer::HintKeys::FRONT_ARTICLE,
              guess_is_front_article(item.getMimetype())}};
   }
 };
 
-std::string getMimeTypeForFile(const std::string& basedir,
-                               const std::string& filename);
-std::string getFileContent(const std::string& path);
+[[nodiscard]]
 std::string decodeUrl(std::string_view encodedUrl);
 
 // Assuming that basePath and targetPath are relative to the same location
 // returns the relative path of targetPath from basePath
+[[nodiscard]]
 std::string computeRelativePath(std::string_view basePath,
                                 std::string_view targetPath);
 
+[[nodiscard]]
 std::string computeAbsolutePath(std::string_view path,
                                 std::string_view relativePath);
 
 [[nodiscard]]
-bool fileExists(const std::string_view path);
+bool fileExists(std::string_view path);
 
 [[nodiscard]]
 bool isDirectory(std::string_view path);
 
+[[nodiscard]]
 std::string base64_encode(unsigned char const* bytes_to_encode, size_t in_len);
 
 void replaceStringInPlaceOnce(std::string& subject,
-                              const std::string& search,
-                              const std::string& replace);
+                              std::string_view search,
+                              std::string_view replace);
+
 void replaceStringInPlace(std::string& subject,
-                          const std::string& search,
-                          const std::string& replace);
+                          std::string_view search,
+                          std::string_view replace);
+
 void stripTitleInvalidChars(std::string& str);
 
 // Returns a vector of the links in a particular page. includes links under
 // 'href' and 'src'
+[[nodiscard]]
 std::vector<html_link> generic_getLinks(std::string_view page);
 
 // checks if a relative path is out of bounds (relative to base)
-bool isOutofBounds(const std::string& input, std::string base);
+[[nodiscard]]
+bool isOutofBounds(std::string_view input, std::string base);
 
 // Adler32 Hash Function. Used to hash the BLOB data obtained from each article,
 // for redundancy checks. Please note that the adler32 hash function has a high
 // number of collisions, and that the hash match is not taken as final.
 // Adler32 is only used in an index elsewhere. Changing to unsigned.
+[[nodiscard]]
 unsigned int adler32(std::string_view buf) noexcept;
 
+[[nodiscard]]
 std::string decodeHtmlEntities(std::string_view str);
 
 // Removes extra spaces from URLs. Usually done by the browser, so web authors
 // sometimes tend to ignore it. Converts the %20 to space.Essential for
 // comparing URLs.
+[[nodiscard]]
 std::string normalize_link(std::string_view input, std::string_view baseUrl);
 
+[[nodiscard]]
 std::string httpRedirectHtml(std::string_view redirectUrl);
+
 #endif  //  OPENZIM_TOOLS_H

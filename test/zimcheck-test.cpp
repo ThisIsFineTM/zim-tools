@@ -1,9 +1,12 @@
 #include <sstream>
 
-#include "../src/zimcheck/checks.h"
+#include <zim-tools/zimcheck/checks.h>
+#include <zim-tools/progress.h>
+
 #include "gtest/gtest.h"
-#include "zim/archive.h"
-#include "zim/zim.h"
+
+#include <zim/archive.h>
+#include <zim/zim.h>
 
 std::string getLine(std::string str)
 {

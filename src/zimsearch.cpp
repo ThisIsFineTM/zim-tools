@@ -17,47 +17,51 @@
  * MA 02110-1301, USA.
  */
 
-#include <iostream>
-#include <zim/search.h>
-#include <zim/archive.h>
-
-#include "version.h"
+#include <zim-tools/version.h>    // for printVersions
+                                  //
+#include <zim/archive.h>          // for Archive
+#include <zim/search.h>           // for Query, Search, SearchResultSet, Sea...
+#include <zim/search_iterator.h>  // for SearchIterator
+                                  //
+#include <exception>              // for exception
+#include <iostream>               // for basic_ostream, operator<<, endl
+#include <string>                 // for char_traits, basic_string, operator==
 
 void printSearchResults(zim::Search& search)
 {
-    auto results = search.getResults(0, search.getEstimatedMatches());
-    for (auto it = results.begin(); it != results.end(); ++it)
-    {
-      std::cout << "article " << it->getIndex() << "\nscore " << it.getScore() << "\t:\t" << it.getTitle() << std::endl;
-    }
+  auto results = search.getResults(0, search.getEstimatedMatches());
+  for (auto it = results.begin(); it != results.end(); ++it) {
+    std::cout << "article " << it->getIndex() << "\nscore " << it.getScore()
+              << "\t:\t" << it.getTitle() << std::endl;
+  }
 }
 
 int main(int argc, char* argv[])
 {
-  try
-  {
-
+  try {
     // version number
-    if (argc > 1 && (std::string(argv[1]) == "-v" || std::string(argv[1])=="--version"))
-    {
+    if (argc > 1
+        && (std::string(argv[1]) == "-v"
+            || std::string(argv[1]) == "--version")) {
       printVersions();
       return 0;
     }
 
-    if (argc <= 2)
-    {
+    if (argc <= 2) {
       std::cerr << "\nzimsearch allows to search content in a ZIM file.\n\n"
-        "usage: " << argv[0] << " [-x indexfile] zimfile searchstring\n"
-        "\n"
-        "options\n"
-        "  -x indexfile   specify indexfile\n"
-        "  -v, --version  print software version\n" << std::endl;
+                   "usage: "
+                << argv[0]
+                << " [-x indexfile] zimfile searchstring\n"
+                   "\n"
+                   "options\n"
+                   "  -x indexfile   specify indexfile\n"
+                   "  -v, --version  print software version\n"
+                << std::endl;
       return 1;
     }
 
     std::string s = argv[2];
-    for (int a = 3; a < argc; ++a)
-    {
+    for (int a = 3; a < argc; ++a) {
       s += ' ';
       s += argv[a];
     }
@@ -68,9 +72,7 @@ int main(int argc, char* argv[])
     query.setQuery(s);
     auto search = searcher.search(query);
     printSearchResults(search);
-  }
-  catch (const std::exception& e)
-  {
+  } catch (const std::exception& e) {
     std::cerr << e.what() << std::endl;
   }
 }

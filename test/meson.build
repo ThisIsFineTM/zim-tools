@@ -19,10 +19,19 @@ zimwriter_srcs = [  '../src/zimwriterfs/tools.cpp',
                     '../src/zimwriterfs/zimcreatorfs.cpp',
                     '../src/tools.cpp']
 
-tests_src_map = { 'zimcheck-test' : ['../src/zimcheck/zimcheck.cpp', '../src/zimcheck/checks.cpp',  '../src/zimcheck/json_tools.cpp', '../src/tools.cpp', '../src/metadata.cpp'],
+tests_src_map = { 'zimcheck-test' : ['../src/zimcheck/zimcheck.cpp',
+                                     '../src/zimcheck/checks.cpp',
+                                     '../src/zimcheck/json_tools.cpp',
+                                     '../src/tools.cpp',
+                                     '../src/metadata.cpp'
+                                     ],
                   'tools-test' : zimwriter_srcs,
                   'metadata-test' : ['../src/metadata.cpp'],
                   'zimwriterfs-zimcreatorfs' : zimwriter_srcs }
+
+zim_tools_test_include_directories = []
+zim_tools_test_include_directories += zim_tools_include_dir
+zim_tools_test_include_directories += inc
 
 if gtest_dep.found() and not meson.is_cross_build()
 
@@ -30,7 +39,7 @@ if gtest_dep.found() and not meson.is_cross_build()
 
         test_exe = executable(test_name, [test_name+'.cpp'] + tests_src_map[test_name],
                               dependencies : test_deps,
-                              include_directories: inc,
+                              include_directories: zim_tools_test_include_directories,
                               build_rpath : '$ORIGIN')
 
         test(test_name, test_exe, timeout : 60,

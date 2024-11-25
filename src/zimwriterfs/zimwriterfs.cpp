@@ -17,28 +17,36 @@
  * MA 02110-1301, USA.
  */
 
-/* Includes */
-#include <getopt.h>
-#include <pthread.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/param.h>
-#include <unistd.h>
-#include <libgen.h>
-#include <limits.h>
-#include <ctime>
+#include <zim-tools/metadata.h>                  // for Metadata
+#include <zim-tools/tools.h>                     // for Formatter, fileExists
+#include <zim-tools/zimwriterfs/tools.h>         // for generateDate, getFil...
+#include <zim-tools/zimwriterfs/zimcreatorfs.h>  // for ZimCreatorFS
+//
+#include <zim/uuid.h>            // for Uuid
+#include <zim/version.h>         // for printVersions
+#include <zim/writer/creator.h>  // for Creator
+#include <zim/zim.h>             // for size_type
+//
+#include <errno.h>      // for errno
+#include <getopt.h>     // for required_argument
+#include <libgen.h>     // for dirname
+#include <magic.h>      // for magic_close, magic_load
+#include <pthread.h>    // for pthread_mutex_destroy
+#include <sys/param.h>  // for MAXPATHLEN
+#include <unistd.h>     // for optarg, optind
+//
+#include <cstdio>     // for NULL
+#include <cstdlib>    // for exit, atoi, realpath
+#include <cstring>    // for strerror, strncpy
+#include <exception>  // for exception
+#include <iostream>   // for basic_ostream, opera...
+#include <stdexcept>  // for invalid_argument
+#include <string>     // for basic_string, char_t...
+#include <utility>    // for pair
+#include <vector>     // for vector
 
-#include <magic.h>
-#include <cstdio>
-#include <queue>
-
-#include "zimcreatorfs.h"
-#include "../metadata.h"
-#include "../tools.h"
-#include "../version.h"
-#include "tools.h"
-
-namespace {
+namespace
+{
 /* Command line options */
 std::string language;
 std::string creator;
@@ -57,9 +65,8 @@ std::string redirectsPath;
 std::string zimPath;
 std::string directoryPath;
 
-
 int threads = 4;
-zim::size_type clusterSize = 2048*1024;
+zim::size_type clusterSize = 2048 * 1024;
 
 bool verboseFlag = false;
 bool withoutFTIndex = false;
@@ -69,38 +76,34 @@ bool continue_without_magic = false;
 
 bool thereAreMissingArguments()
 {
-  if ( directoryPath.empty() || zimPath.empty() )
+  if (directoryPath.empty() || zimPath.empty())
     return true;
 
-  if ( dontCheckArgs )
+  if (dontCheckArgs)
     return false;
 
-  return creator.empty()
-      || name.empty()
-      || publisher.empty()
-      || description.empty()
-      || language.empty()
-      || welcome.empty()
-      || title.empty()
-      || illustration.empty();
+  return creator.empty() || name.empty() || publisher.empty()
+         || description.empty() || language.empty() || welcome.empty()
+         || title.empty() || illustration.empty();
 }
 
-zim::Metadata makeMetadata() {
+zim::Metadata makeMetadata()
+{
   zim::Metadata metadata;
 
-  metadata.set("Language",        language);
-  metadata.set("Publisher",       publisher);
-  metadata.set("Creator",         creator);
-  metadata.set("Title",           title);
-  metadata.set("Description",     description);
+  metadata.set("Language", language);
+  metadata.set("Publisher", publisher);
+  metadata.set("Creator", creator);
+  metadata.set("Title", title);
+  metadata.set("Description", description);
   metadata.set("LongDescription", longDescription);
-  metadata.set("Name",            name);
-  metadata.set("Source",          source);
-  metadata.set("Flavour",         flavour);
-  metadata.set("Scraper",         scraper);
-  metadata.set("Tags",            tags);
-  metadata.set("Date",            generateDate());
-  if ( !illustration.empty() )  {
+  metadata.set("Name", name);
+  metadata.set("Source", source);
+  metadata.set("Flavour", flavour);
+  metadata.set("Scraper", scraper);
+  metadata.set("Tags", tags);
+  metadata.set("Date", generateDate());
+  if (!illustration.empty()) {
     const auto data = getFileContent(directoryPath + "/" + illustration);
     metadata.set("Illustration_48x48@1", data);
   }
@@ -108,14 +111,13 @@ zim::Metadata makeMetadata() {
   return metadata;
 }
 
-
 bool checkMetadata(const zim::Metadata& metadata)
 {
   const auto errors = metadata.check();
 
-  if ( !errors.empty() ) {
+  if (!errors.empty()) {
     std::cerr << "Metadata doesn't meet the following requirements:\n";
-    for ( const auto& err : errors ) {
+    for (const auto& err : errors) {
       std::cerr << "    " << err << std::endl;
     }
   }
@@ -125,7 +127,7 @@ bool checkMetadata(const zim::Metadata& metadata)
 
 void addMetadata(ZimCreatorFS& zimCreator, const zim::Metadata& metadata)
 {
-  for ( const auto& kv : metadata ) {
+  for (const auto& kv : metadata) {
     if (kv.first == "Illustration_48x48@1") {
       zimCreator.addIllustration(48, kv.second);
     } else {
@@ -134,8 +136,7 @@ void addMetadata(ZimCreatorFS& zimCreator, const zim::Metadata& metadata)
   }
 }
 
-
-}
+}  // namespace
 
 // Global flags
 bool inflateHtmlFlag = false;
@@ -152,7 +153,8 @@ bool isVerbose()
   return retVal;
 }
 
-void printZimWriterFsVersions(std::ostream& out = std::cout) {
+void printZimWriterFsVersions(std::ostream& out = std::cout)
+{
   out << "zim-tools " << VERSION << std::endl;
   out << "+ libmagic " << magic_version() << std::endl;
   out << std::endl;
@@ -177,7 +179,8 @@ void usage()
   std::cout << "\t-w, --welcome\t\tpath of default/main HTML page. The path "
                "must be relative to HTML_DIRECTORY."
             << std::endl;
-  std::cout << "\t-I, --illustration\tpath of ZIM file illustration. The path must be "
+  std::cout << "\t-I, --illustration\tpath of ZIM file illustration. The path "
+               "must be "
                "relative to HTML_DIRECTORY and the image a 48x48 PNG."
             << std::endl;
   std::cout << "\t-l, --language\t\tlanguage code of the content in ISO639-3"
@@ -206,30 +209,34 @@ void usage()
   std::cout << "\t-V, --version\t\tprint the version number" << std::endl;
   std::cout << "\t-L, --longDescription\tlong description of the content"
             << std::endl;
-  std::cout
-      << "\t-m, --clusterSize\tnumber of bytes per ZIM cluster (default: 2048Kb)"
-      << std::endl;
+  std::cout << "\t-m, --clusterSize\tnumber of bytes per ZIM cluster (default: "
+               "2048Kb)"
+            << std::endl;
   std::cout << "\t-J, --threads\t\tcount of threads to utilize (default: 4)"
-      << std::endl;
+            << std::endl;
   std::cout << "\t-x, --inflateHtml\ttry to inflate HTML files before packing "
                "(*.html, *.htm, ...)"
             << std::endl;
   std::cout << "\t-r, --redirects\t\tpath to a TSV file containing a list of "
                "redirects (url title target_url)."
             << std::endl;
-  std::cout
-      << "\t-j, --withoutFTIndex\tdon't create and add a fulltext index of the content to the ZIM."
-      << std::endl;
+  std::cout << "\t-j, --withoutFTIndex\tdon't create and add a fulltext index "
+               "of the content to the ZIM."
+            << std::endl;
   std::cout << "\t-a, --tags\t\ttags - semicolon separated" << std::endl;
   std::cout << "\t-e, --source\t\tcontent source URL" << std::endl;
   std::cout << "\t-o, --flavour\t\tcustom (version independent) content flavour"
             << std::endl;
-  std::cout << "\t-s, --scraper\t\tname & version of tool used to produce HTML content"
+  std::cout << "\t-s, --scraper\t\tname & version of tool used to produce HTML "
+               "content"
             << std::endl;
-  std::cout << "\t--skip-libmagic-check\tAccept to run even if magic file cannot be loaded (mimetypes in the zim file may be wrong)." << std::endl;
-  // --no-uuid and --dont-check-arguments are dev options, let's keep them secret
-  // std::cout << "\t-U, --no-uuid\t\tdon't generate a random UUID" << std::endl;
-  // std::cout << "\t-B, --dont-check-arguments\t\tdon't check arguments (and possibly produce a broken ZIM file)" << std::endl;
+  std::cout << "\t--skip-libmagic-check\tAccept to run even if magic file "
+               "cannot be loaded (mimetypes in the zim file may be wrong)."
+            << std::endl;
+  // --no-uuid and --dont-check-arguments are dev options, let's keep them
+  // secret std::cout << "\t-U, --no-uuid\t\tdon't generate a random UUID" <<
+  // std::endl; std::cout << "\t-B, --dont-check-arguments\t\tdon't check
+  // arguments (and possibly produce a broken ZIM file)" << std::endl;
   std::cout << std::endl;
 
   std::cout << "Example:" << std::endl;
@@ -245,7 +252,6 @@ void usage()
   std::cout << "\tZIM format: https://openzim.org" << std::endl;
   std::cout << std::endl;
 }
-
 
 void parse_args(int argc, char** argv)
 {
@@ -284,8 +290,11 @@ void parse_args(int argc, char** argv)
   int c;
 
   do {
-    c = getopt_long(
-        argc, argv, "a:hVvijxuw:I:t:d:c:l:p:r:e:n:m:J:UBL:", long_options, &option_index);
+    c = getopt_long(argc,
+                    argv,
+                    "a:hVvijxuw:I:t:d:c:l:p:r:e:n:m:J:UBL:",
+                    long_options,
+                    &option_index);
 
     if (c != -1) {
       switch (c) {
@@ -380,7 +389,7 @@ void parse_args(int argc, char** argv)
     }
   }
 
-  if ( thereAreMissingArguments() ) {
+  if (thereAreMissingArguments()) {
     if (argc > 1)
       std::cerr << "zimwriterfs: too few arguments!" << std::endl;
     usage();
@@ -404,16 +413,17 @@ void parse_args(int argc, char** argv)
   }
 
   if (!dontCheckArgs && !fileExists(directoryPath + "/" + illustration)) {
-    std::cerr << "zimwriterfs: unable to find illustration at " << directoryPath
-              << "/" << illustration
-              << "'. --illustration path/value must be relative to HTML_DIRECTORY."
-              << std::endl;
+    std::cerr
+        << "zimwriterfs: unable to find illustration at " << directoryPath
+        << "/" << illustration
+        << "'. --illustration path/value must be relative to HTML_DIRECTORY."
+        << std::endl;
     exit(1);
   }
 
   if (fileExists(zimPath)) {
-    std::cerr << "zimwriterfs: Error: destination .zim file '" << zimPath << "' already exists."
-              << std::endl;
+    std::cerr << "zimwriterfs: Error: destination .zim file '" << zimPath
+              << "' already exists." << std::endl;
     exit(1);
   }
 
@@ -423,7 +433,7 @@ void parse_args(int argc, char** argv)
     tags += "_ftindex:no";
   } else {
     tags += "_ftindex:yes";
-    tags += ";_ftindex"; // For backward compatibility
+    tags += ";_ftindex";  // For backward compatibility
   }
 }
 
@@ -431,37 +441,40 @@ void create_zim(const zim::Metadata& metadata)
 {
   ZimCreatorFS zimCreator(directoryPath);
   zimCreator.configVerbose(isVerbose())
-            .configNbWorkers(threads)
-            .configClusterSize(clusterSize)
-            .configIndexing(!withoutFTIndex, language);
-  if ( noUuid ) {
+      .configNbWorkers(threads)
+      .configClusterSize(clusterSize)
+      .configIndexing(!withoutFTIndex, language);
+  if (noUuid) {
     zimCreator.setUuid(zim::Uuid());
   }
-  if (zimPath.size() >= (MAXPATHLEN-1)) {
+  if (zimPath.size() >= (MAXPATHLEN - 1)) {
     throw std::invalid_argument("Target .zim file path is too long");
   }
 
   char buf[MAXPATHLEN];
-  strncpy(buf, zimPath.c_str(), sizeof(buf)-1);
+  strncpy(buf, zimPath.c_str(), sizeof(buf) - 1);
   // dirname() can modify its argument, so need to pass a copy
   std::string zimdir = dirname(buf);
 
   if (realpath(zimdir.c_str(), buf) != buf) {
     throw std::invalid_argument(
-          Formatter() << "Unable to canonicalize target directory of .zim "
-                      << zimdir << ": " << strerror(errno));
+        Formatter() << "Unable to canonicalize target directory of .zim "
+                    << zimdir << ": " << strerror(errno));
   }
 
-  // Check that the resulting .zim file isn't located under source HTML directory
+  // Check that the resulting .zim file isn't located under source HTML
+  // directory
   if (std::string(buf).find(zimCreator.canonicalBaseDir()) == 0) {
-    throw std::invalid_argument(".zim file to create cannot be located inside of source HTML directory");
+    throw std::invalid_argument(
+        ".zim file to create cannot be located inside of source HTML "
+        "directory");
   }
 
   zimCreator.startZimCreation(zimPath);
 
   addMetadata(zimCreator, metadata);
 
-  if ( !welcome.empty() )  {
+  if (!welcome.empty()) {
     zimCreator.setMainPath(welcome);
   }
 
@@ -486,7 +499,6 @@ void create_zim(const zim::Metadata& metadata)
   zimCreator.finishZimCreation();
 }
 
-
 /* Main program entry point */
 int main(int argc, char** argv)
 {
@@ -495,8 +507,10 @@ int main(int argc, char** argv)
   /* Init */
   magic = magic_open(MAGIC_MIME);
   if (magic_load(magic, NULL) != 0) {
-    std::cerr << "Impossible to load magic file. Set `MAGIC` environment variable to a `magic` (or `magic.mgc`) file." << std::endl;
-    if (! continue_without_magic) {
+    std::cerr << "Impossible to load magic file. Set `MAGIC` environment "
+                 "variable to a `magic` (or `magic.mgc`) file."
+              << std::endl;
+    if (!continue_without_magic) {
       exit(1);
     }
   }
@@ -505,13 +519,12 @@ int main(int argc, char** argv)
   try {
     const zim::Metadata metadata = makeMetadata();
 
-    if ( !checkMetadata(metadata) ) {
+    if (!checkMetadata(metadata)) {
       exit(1);
     }
 
     create_zim(metadata);
-  }
-  catch(std::exception &e) {
+  } catch (std::exception& e) {
     std::cerr << "zimwriterfs: " << e.what() << std::endl;
     exit(1);
   }
