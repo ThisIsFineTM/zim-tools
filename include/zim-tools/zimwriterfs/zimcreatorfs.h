@@ -21,11 +21,11 @@
 #ifndef OPENZIM_ZIMWRITERFS_ZIMCREATORFS_H
 #define OPENZIM_ZIMWRITERFS_ZIMCREATORFS_H
 
-#include <vector>
-#include <string>
-#include <functional>
+#include <zim/writer/creator.h>  // for Creator
 
-#include <zim/writer/creator.h>
+#include <functional>  // for function
+#include <iosfwd>      // for istream
+#include <string>      // for string, basic_string
 
 class ZimCreatorFS : public zim::writer::Creator
 {
@@ -38,14 +38,18 @@ class ZimCreatorFS : public zim::writer::Creator
 
   virtual void addFile(const std::string& path);
 
-  void processSymlink(const std::string& curdir, const std::string& symlink_path);
-  const std::string & basedir() const { return directoryPath; }
-  const std::string & canonicalBaseDir() const { return canonical_basedir; }
-  std::string parseAndAdaptHtml(std::string& data, std::string& title, const std::string& url);
+  void processSymlink(const std::string& curdir,
+                      const std::string& symlink_path);
+  const std::string& basedir() const { return directoryPath; }
+  const std::string& canonicalBaseDir() const { return canonical_basedir; }
+  std::string parseAndAdaptHtml(std::string& data,
+                                std::string& title,
+                                const std::string& url);
   void adaptCss(std::string& data, const std::string& url);
 
-  void addMetadata(const std::string& key, const std::string& content) {
-    if ( !content.empty() ) {
+  void addMetadata(const std::string& key, const std::string& content)
+  {
+    if (!content.empty()) {
       zim::writer::Creator::addMetadata(key, content);
     }
   }

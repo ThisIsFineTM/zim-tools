@@ -1,12 +1,15 @@
-#include <sstream>
-
-#include <zim-tools/zimcheck/checks.h>
 #include <zim-tools/progress.h>
-
-#include "gtest/gtest.h"
-
+#include <zim-tools/zimcheck/checks.h>
 #include <zim/archive.h>
 #include <zim/zim.h>
+
+#include <initializer_list>  // for initializer_list
+#include <iostream>          // for cerr, cout
+#include <sstream>
+#include <string>
+#include <vector>  // for vector
+
+#include "gtest/gtest.h"
 
 std::string getLine(std::string str)
 {

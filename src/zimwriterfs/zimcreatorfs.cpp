@@ -19,34 +19,43 @@
  */
 
 #include <zim-tools/zimwriterfs/zimcreatorfs.h>
-#include <zim-tools/tools.h>
-#include <zim-tools/zimwriterfs/tools.h>
+//
+#include <zim-tools/tools.h>              // for Formatter, computeAbsolutePath
+#include <zim-tools/zimwriterfs/tools.h>  // for getFileContent, getMimeType...
+//
+#include <zim/writer/item.h>  // for FileItem, HintKeys, StringItem
+//
+#include <gumbo.h>  // for GumboInternalNode, GumboNode
+//
+#include <dirent.h>    // for closedir, dirent, opendir
+#include <errno.h>     // for errno
+#include <limits.h>    // for PATH_MAX
+#include <sys/stat.h>  // for stat, S_ISDIR, S_ISREG
+//
+#include <algorithm>  // for replace
+#include <cstdlib>    // for NULL, exit, realpath, size_t
+#include <cstring>    // for strerror, strncmp
+#include <fstream>    // for basic_ostream, operator<<
+#include <iostream>   // for cerr, cout
+#include <memory>     // for shared_ptr, make_shared
+#include <regex>      // for match_results, regex_search
+#include <stdexcept>  // for runtime_error, invalid_argu...
 
-#include <fstream>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <regex>
-#include <unistd.h>
-#include <limits.h>
-#include <cassert>
-
-void parse_redirectArticles(std::istream& in_stream, redirect_handler handler) {
+void parse_redirectArticles(std::istream& in_stream, redirect_handler handler)
+{
   std::string line;
   int line_number = 1;
   while (std::getline(in_stream, line)) {
     std::regex line_regex("^([^\\t]+)\\t([^\\t]+)\\t([^\\t]+)$");
     std::smatch matches;
     if (!std::regex_search(line, matches, line_regex) || matches.size() != 4) {
-      throw std::runtime_error(
-        Formatter() << "Invalid line #" << line_number << " : '" << line << "'"
-      );
+      throw std::runtime_error(Formatter() << "Invalid line #" << line_number
+                                           << " : '" << line << "'");
     }
 
-    Redirect redirect = {
-      .path= matches[1].str(),
-      .title = matches[2].str(),
-      .target = matches[3].str()
-    };
+    Redirect redirect = {.path = matches[1].str(),
+                         .title = matches[2].str(),
+                         .target = matches[3].str()};
     handler(redirect);
     ++line_number;
   }
@@ -55,14 +64,14 @@ void parse_redirectArticles(std::istream& in_stream, redirect_handler handler) {
 bool isVerbose();
 
 ZimCreatorFS::ZimCreatorFS(std::string _directoryPath)
-  : directoryPath(_directoryPath)
+    : directoryPath(_directoryPath)
 {
   char buf[PATH_MAX];
 
   if (realpath(directoryPath.c_str(), buf) != buf) {
-    throw std::invalid_argument(
-          Formatter() << "Unable to canonicalize HTML directory path "
-                      << directoryPath << ": " << strerror(errno));
+    throw std::invalid_argument(Formatter()
+                                << "Unable to canonicalize HTML directory path "
+                                << directoryPath << ": " << strerror(errno));
   }
 
   canonical_basedir = buf;
@@ -74,17 +83,13 @@ void ZimCreatorFS::add_redirectArticles_from_file(const std::string& path)
 
   in_stream.open(path.c_str());
   try {
-    parse_redirectArticles(in_stream,
-      [this](Redirect redirect) {
-        this->addRedirection(
-          redirect.path,
-          redirect.title,
-          redirect.target,
-          {{zim::writer::HintKeys::FRONT_ARTICLE, 1}}
-        );
-      }
-    );
-  } catch(const std::runtime_error& e) {
+    parse_redirectArticles(in_stream, [this](Redirect redirect) {
+      this->addRedirection(redirect.path,
+                           redirect.title,
+                           redirect.target,
+                           {{zim::writer::HintKeys::FRONT_ARTICLE, 1}});
+    });
+  } catch (const std::runtime_error& e) {
     std::cerr << e.what() << "\nin redirect file " << path << std::endl;
     in_stream.close();
     exit(1);
@@ -171,14 +176,14 @@ void ZimCreatorFS::visitDirectory(const std::string& path)
 
 void ZimCreatorFS::addFile(const std::string& path)
 {
-  auto url = path.substr(directoryPath.size()+1);
+  auto url = path.substr(directoryPath.size() + 1);
   auto mimetype = getMimeTypeForFile(directoryPath, url);
   auto title = std::string{};
   zim::writer::Hints hints;
 
   std::shared_ptr<zim::writer::Item> item;
-  if ( mimetype.find("text/html") != std::string::npos
-    || mimetype.find("text/css") != std::string::npos) {
+  if (mimetype.find("text/html") != std::string::npos
+      || mimetype.find("text/css") != std::string::npos) {
     auto content = getFileContent(path);
 
     if (mimetype.find("text/html") != std::string::npos) {
@@ -193,14 +198,17 @@ void ZimCreatorFS::addFile(const std::string& path)
       adaptCss(content, url);
     }
 
-    item = zim::writer::StringItem::create(url, mimetype, title, hints, content);
+    item
+        = zim::writer::StringItem::create(url, mimetype, title, hints, content);
   } else {
-    item = std::make_shared<zim::writer::FileItem>(url, mimetype, title, hints, path);
+    item = std::make_shared<zim::writer::FileItem>(
+        url, mimetype, title, hints, path);
   }
   addItem(item);
 }
 
-void ZimCreatorFS::processSymlink(const std::string& /*curdir*/, const std::string& symlink_path)
+void ZimCreatorFS::processSymlink(const std::string& /*curdir*/,
+                                  const std::string& symlink_path)
 {
   /* #102 Links can be 3 different types:
    *  - dandling (not pointing to a valid file)
@@ -211,18 +219,19 @@ void ZimCreatorFS::processSymlink(const std::string& /*curdir*/, const std::stri
   if (realpath(symlink_path.c_str(), resolved) != resolved) {
     // looping symlinks also fall here: Too many levels of symbolic links
     // It also handles dangling symlink: No such file or directory
-    std::cerr << "Unable to resolve symlink " << symlink_path
-              << ": " << strerror(errno) << std::endl;
+    std::cerr << "Unable to resolve symlink " << symlink_path << ": "
+              << strerror(errno) << std::endl;
     return;
   }
 
   if (isDirectory(resolved)) {
-    std::cerr << "Skip symlink " << symlink_path
-              << ": points to a directory" << std::endl;
+    std::cerr << "Skip symlink " << symlink_path << ": points to a directory"
+              << std::endl;
     return;
   }
 
-  if (strncmp(canonical_basedir.c_str(), resolved, canonical_basedir.size()) != 0
+  if (strncmp(canonical_basedir.c_str(), resolved, canonical_basedir.size())
+          != 0
       || resolved[canonical_basedir.size()] != '/') {
     std::cerr << "Skip symlink " << symlink_path
               << ": points outside of HTML directory" << std::endl;
@@ -230,7 +239,8 @@ void ZimCreatorFS::processSymlink(const std::string& /*curdir*/, const std::stri
   }
 
   std::string source_url = symlink_path.substr(directoryPath.size() + 1);
-  std::string target_url = std::string(resolved).substr(canonical_basedir.size() + 1);
+  std::string target_url
+      = std::string(resolved).substr(canonical_basedir.size() + 1);
   addRedirection(source_url, "", target_url);
 }
 
@@ -256,11 +266,16 @@ inline std::string removeLocalTagAndParameters(const std::string& url)
 
 struct GumboOutputDestructor {
   GumboOutputDestructor(GumboOutput* output) : output(output) {}
-  ~GumboOutputDestructor() { gumbo_destroy_output(&kGumboDefaultOptions, output); }
+  ~GumboOutputDestructor()
+  {
+    gumbo_destroy_output(&kGumboDefaultOptions, output);
+  }
   GumboOutput* output;
 };
 
-std::string ZimCreatorFS::parseAndAdaptHtml(std::string& data, std::string& title, const std::string& url)
+std::string ZimCreatorFS::parseAndAdaptHtml(std::string& data,
+                                            std::string& title,
+                                            const std::string& url)
 {
   GumboOutput* output = gumbo_parse(data.c_str());
   GumboOutputDestructor outputDestructor(output);
@@ -310,7 +325,8 @@ std::string ZimCreatorFS::parseAndAdaptHtml(std::string& data, std::string& titl
         auto redirectUrl = computeAbsolutePath(url, decodeUrl(targetUrl));
         auto redirectUrlPath = directoryPath + "/" + redirectUrl;
         if (!fileExists(redirectUrlPath)) {
-          throw std::runtime_error("'" + url + "' HTML redirection target path '"
+          throw std::runtime_error("'" + url
+                                   + "' HTML redirection target path '"
                                    + redirectUrlPath + "' doesn't exist.");
         }
         return redirectUrl;
@@ -335,7 +351,8 @@ std::string ZimCreatorFS::parseAndAdaptHtml(std::string& data, std::string& titl
   return "";
 }
 
-void ZimCreatorFS::adaptCss(std::string& data, const std::string& url) {
+void ZimCreatorFS::adaptCss(std::string& data, const std::string& url)
+{
   /* Rewrite url() values in the CSS */
   size_t startPos = 0;
   size_t endPos = 0;
@@ -343,17 +360,13 @@ void ZimCreatorFS::adaptCss(std::string& data, const std::string& url) {
 
   while ((startPos = data.find("url(", endPos))
          && startPos != std::string::npos) {
-
     /* URL delimiters */
     endPos = data.find(")", startPos);
-    startPos = startPos + (data[startPos + 4] == '\''
-                                   || data[startPos + 4] == '"'
-                               ? 5
-                               : 4);
-    endPos = endPos - (data[endPos - 1] == '\''
-                               || data[endPos - 1] == '"'
-                           ? 1
-                           : 0);
+    startPos
+        = startPos
+          + (data[startPos + 4] == '\'' || data[startPos + 4] == '"' ? 5 : 4);
+    endPos = endPos
+             - (data[endPos - 1] == '\'' || data[endPos - 1] == '"' ? 1 : 0);
     targetUrl = data.substr(startPos, endPos - startPos);
     std::string startDelimiter = data.substr(startPos - 1, 1);
     std::string endDelimiter = data.substr(endPos, 1);
@@ -385,9 +398,9 @@ void ZimCreatorFS::adaptCss(std::string& data, const std::string& url) {
             data,
             startDelimiter + targetUrl + endDelimiter,
             startDelimiter + "data:" + mimeType + ";base64,"
-                + base64_encode(reinterpret_cast<const unsigned char*>(
-                                    fontContent.c_str()),
-                                fontContent.length())
+                + base64_encode(
+                    reinterpret_cast<const unsigned char*>(fontContent.c_str()),
+                    fontContent.length())
                 + endDelimiter);
       } catch (...) {
       }

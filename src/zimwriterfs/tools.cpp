@@ -20,7 +20,7 @@
 
 #include <zim-tools/zimwriterfs/tools.h>
 //
-#include <gumbo.h>     // for GumboNode, GumboAttribute, GumboInternalNode
+#include <gumbo.h>  // for GumboNode, GumboAttribute, GumboInternalNode
 //
 #ifndef ZLIB_CONST
 #define ZLIB_CONST

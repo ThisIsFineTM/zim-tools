@@ -23,7 +23,6 @@
 
 #include <gumbo.h>  // for GumboVector
 
-#include <string>       // for string
 #include <string_view>  // for string_view
 
 [[nodiscard]]
@@ -37,6 +36,6 @@ std::string getMimeTypeForFile(std::string_view basedir,
                                std::string_view filename);
 
 [[nodiscard]]
-std::string getFileContent(const std::string& path);
+std::string getFileContent(std::string_view path);
 
 #endif  //  OPENZIM_ZIMWRITERFS_TOOLS_H

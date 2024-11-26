@@ -15,51 +15,62 @@
  *
  */
 
-#include <unistd.h>
-#include <iostream>
-#include <magic.h>
+#include <zim-tools/zimwriterfs/zimcreatorfs.h>  // for Redirect, ZimCreatorFS
+//
+#include <zim/archive.h>  // for Archive
+#include <zim/entry.h>    // for Entry
+//
+#include <magic.h>   // for magic_load, magic_open
+#include <unistd.h>  // for unlink
 
-#include <zim/archive.h>
+#include <cstddef>    // for NULL
+#include <sstream>    // for basic_stringstream
+#include <stdexcept>  // for runtime_error, inval...
+#include <string>     // for basic_string, char_t...
+#include <vector>     // for vector
 
-#include "gtest/gtest.h"
-
-#include <zim-tools/zimwriterfs/zimcreatorfs.h>
-#include <zim-tools/tools.h>
-
+#include "gtest/gtest.h"  // for AssertionResult, Test
 
 // stub from zimwriterfs.cpp
 bool inflateHtmlFlag = false;
-bool isVerbose() { return false; }
+bool isVerbose()
+{
+  return false;
+}
 magic_t magic;
 
 class LibMagicInit
 {
-public:
+ public:
   LibMagicInit()
   {
-    if (! done) {
+    if (!done) {
       magic = magic_open(MAGIC_MIME);
       magic_load(magic, NULL);
       done = true;
     }
   }
-private:
+
+ private:
   static bool done;
 };
 
 bool LibMagicInit::done = false;
 
-
 class TempFile
 {
-public:
-  TempFile(const char *name) { _name = "/tmp/"; _name += name; }
+ public:
+  TempFile(const char* name)
+  {
+    _name = "/tmp/";
+    _name += name;
+  }
   ~TempFile() { unlink(_name.c_str()); }
-  const char *path() { return _name.c_str(); }
-private:
+  const char* path() { return _name.c_str(); }
+
+ private:
   std::string _name;
 };
-
 
 TEST(ZimCreatorFSTest, MinimalZim)
 {
@@ -103,7 +114,6 @@ TEST(ZimCreatorFSTest, SymlinkShouldCreateRedirectEntry)
   zimCreator.visitDirectory(directoryPath);
   zimCreator.finishZimCreation();
 
-
   // VERIFY the created .zim file with 'zimdump'
   zim::Archive archive(out.path());
   EXPECT_EQ(archive.getEntryCount(), 3u);
@@ -123,58 +133,45 @@ TEST(ZimCreatorFSTest, SymlinkShouldCreateRedirectEntry)
 
 TEST(ZimCreatorFSTest, ThrowsErrorIfDirectoryNotExist)
 {
-  EXPECT_THROW({
-    ZimCreatorFS zimCreator("Non-existing-dir");
-  }, std::invalid_argument );
+  EXPECT_THROW(
+      { ZimCreatorFS zimCreator("Non-existing-dir"); }, std::invalid_argument);
 }
 
-bool operator==(const Redirect& a, const Redirect& b) {
+bool operator==(const Redirect& a, const Redirect& b)
+{
   return a.path == b.path && a.title == b.title && a.target == b.target;
 }
 
 TEST(ZimCreatorFSTest, ParseRedirect)
 {
   {
-  std::stringstream ss;
-  ss << "path\ttitle\ttarget\n";
-  ss << "A/path/to/somewhere\tAn amazing title\tAnother/path";
+    std::stringstream ss;
+    ss << "path\ttitle\ttarget\n";
+    ss << "A/path/to/somewhere\tAn amazing title\tAnother/path";
 
-  std::vector<Redirect> found;
-  parse_redirectArticles(
-    ss,
-    [&](Redirect redirect)
-     {found.push_back(redirect);}
-  );
+    std::vector<Redirect> found;
+    parse_redirectArticles(
+        ss, [&](Redirect redirect) { found.push_back(redirect); });
 
-  const std::vector<Redirect> expected {
-    {"path", "title", "target"},
-    {"A/path/to/somewhere", "An amazing title", "Another/path"}
-  };
-  EXPECT_EQ(found, expected);
+    const std::vector<Redirect> expected{
+        {"path", "title", "target"},
+        {"A/path/to/somewhere", "An amazing title", "Another/path"}};
+    EXPECT_EQ(found, expected);
   }
-
 
   {
     std::stringstream ss;
     ss << "A/path\tOups, no target";
-    EXPECT_THROW({
-      parse_redirectArticles(
-            ss,
-            [&](Redirect /*redirect*/)
-             {}
-          );
-    }, std::runtime_error);
+    EXPECT_THROW(
+        { parse_redirectArticles(ss, [&](Redirect /*redirect*/) {}); },
+        std::runtime_error);
   }
 
   {
-      std::stringstream ss;
-      ss << "A/path\ttitle\ttarget\tOups, too many tabs\n";
-      EXPECT_THROW({
-        parse_redirectArticles(
-              ss,
-              [&](Redirect /*redirect*/)
-               {}
-            );
-      }, std::runtime_error);
-    }
+    std::stringstream ss;
+    ss << "A/path\ttitle\ttarget\tOups, too many tabs\n";
+    EXPECT_THROW(
+        { parse_redirectArticles(ss, [&](Redirect /*redirect*/) {}); },
+        std::runtime_error);
+  }
 }
