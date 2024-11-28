@@ -52,7 +52,7 @@ bool isDirectory(std::string_view path)
 }
 
 // base64
-constexpr std::string_view base64_chars
+constexpr static std::string_view base64_chars
     = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
       "abcdefghijklmnopqrstuvwxyz"
       "0123456789+/";
@@ -269,6 +269,12 @@ std::optional<const std::string_view> getHtmlEntity(const std::string_view core)
   return it != t.end() ? Return_t{std::in_place, it->second} : std::nullopt;
 }
 
+template <typename Itr>
+std::string_view make_sv(Itr start, Itr end)
+{
+    return std::string_view(start, std::distance(start, end));
+}
+
 }  // unnamed namespace
 
 std::string decodeHtmlEntities(std::string_view str)
@@ -287,7 +293,7 @@ std::string decodeHtmlEntities(std::string_view str)
     } else if (start == str.cend()) {
       result.push_back(*p);
     } else if (*p == ';') {
-      if (auto d = getHtmlEntity(std::string_view{start + 1, p})) {
+      if (auto d = getHtmlEntity(make_sv(start + 1, p))) {
         result += d.value();
       } else {
         result.append(start, p + 1);
@@ -343,8 +349,8 @@ std::vector<html_link> generic_getLinks(std::string_view page)
     while (*p != delimiter) {
       p++;
     }
-    std::string link(linkStart, p);
-    links.push_back(html_link(attr, decodeHtmlEntities(link)));
+    links.push_back(
+        html_link(attr, decodeHtmlEntities(make_sv(linkStart, p))));
     p += 1;
   }
   return links;
@@ -524,9 +530,9 @@ UriKind html_link::detectUriKind(std::string_view input_string) noexcept
 namespace
 {
 
-static constexpr bool isReservedUrlChar(char c) noexcept
+static bool isReservedUrlChar(char c) noexcept
 {
-  constexpr std::array<char, 10> reserved
+  constexpr static std::array<char, 10> reserved
       = {{';', ',', '?', ':', '@', '&', '=', '+', '$'}};
 
   return std::any_of(

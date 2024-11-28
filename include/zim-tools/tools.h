@@ -34,6 +34,7 @@
 #include <string_view>  // for string_view
 #include <utility>      // for move, forward, pair
 #include <vector>       // for vector
+#include <utility>
 
 /* Formatter for std::exception what() message:
  * throw std::runtime_error(
@@ -117,13 +118,13 @@ class html_link final
   static UriKind detectUriKind(std::string_view input_string) noexcept;
 
   [[nodiscard]]
-  constexpr std::string_view attribute() const noexcept
+  std::string_view attribute() const noexcept
   {
     return attribute_;
   }
 
   [[nodiscard]]
-  constexpr std::string_view link() const noexcept
+  std::string_view link() const noexcept
   {
     return link_;
   }
@@ -146,8 +147,8 @@ class ItemProvider : public zim::writer::ContentProvider
  private:
   using Parent_t = zim::writer::ContentProvider;
 
-  zim::Item item;
-  bool feeded{};
+  zim::Item item_;
+  bool feeded_{};
 
  public:
   ItemProvider() = delete;
@@ -156,8 +157,8 @@ class ItemProvider : public zim::writer::ContentProvider
   ItemProvider(const ItemProvider&) = default;
   ItemProvider(ItemProvider&&) noexcept = default;
 
-  ItemProvider(zim::Item item)
-      : Parent_t(), item(std::move(item)), feeded(false)
+  ItemProvider(zim::Item item) noexcept
+      : Parent_t(), item_(std::move(item)), feeded_(false)
   {
   }
 
@@ -167,22 +168,22 @@ class ItemProvider : public zim::writer::ContentProvider
   [[nodiscard]]
   zim::size_type getSize() const override
   {
-    return item.getSize();
+    return item_.getSize();
   }
 
   [[nodiscard]]
   zim::Blob feed() override
   {
-    if (feeded) {
+    if (feeded_) {
       return zim::Blob();
     }
-    feeded = true;
-    return item.getData();
+    feeded_ = true;
+    return item_.getData();
   }
 };
 
 // Guess if the item is a front article.
-// This is not a exact science, we use the mimetype to infer it.
+// This is not an exact science, so we use the mimetype to infer it.
 [[nodiscard]]
 bool guess_is_front_article(std::string_view mimetype);
 
@@ -194,7 +195,7 @@ class CopyItem
   using Parent_t = zim::writer::Item;
 
   // article from an existing ZIM file.
-  zim::Item item;
+  zim::Item item_;
 
  public:
   CopyItem() = delete;
@@ -202,7 +203,7 @@ class CopyItem
 
   CopyItem(const CopyItem&) = default;
   CopyItem(CopyItem&&) noexcept = default;
-  explicit CopyItem(const zim::Item& item) : Parent_t(), item(item) {}
+  explicit CopyItem(const zim::Item& item) : Parent_t(), item_(item) {}
 
   CopyItem& operator=(const CopyItem&) = default;
   CopyItem& operator=(CopyItem&&) noexcept = default;
@@ -210,33 +211,33 @@ class CopyItem
   [[nodiscard]]
   std::string getPath() const override
   {
-    return item.getPath();
+    return item_.getPath();
   }
 
   [[nodiscard]]
   std::string getTitle() const override
   {
-    return item.getTitle();
+    return item_.getTitle();
   }
 
   [[nodiscard]]
   std::string getMimeType() const override
   {
-    return item.getMimetype();
+    return item_.getMimetype();
   }
 
   [[nodiscard]]
   std::unique_ptr<zim::writer::ContentProvider> getContentProvider()
       const override
   {
-    return std::make_unique<ItemProvider>(item);
+    return std::make_unique<ItemProvider>(item_);
   }
 
   [[nodiscard]]
   zim::writer::Hints getHints() const override
   {
     return {{zim::writer::HintKeys::FRONT_ARTICLE,
-             guess_is_front_article(item.getMimetype())}};
+             guess_is_front_article(item_.getMimetype())}};
   }
 };
 
@@ -299,5 +300,11 @@ std::string normalize_link(std::string_view input, std::string_view baseUrl);
 
 [[nodiscard]]
 std::string httpRedirectHtml(std::string_view redirectUrl);
+
+template <typename T, typename... Args>
+constexpr bool is_any_of(T&& lhs, Args&&... args) noexcept
+{
+    return ((std::forward<T>(lhs) == std::forward<Args>(args)) || ...);
+}
 
 #endif  //  OPENZIM_TOOLS_H
