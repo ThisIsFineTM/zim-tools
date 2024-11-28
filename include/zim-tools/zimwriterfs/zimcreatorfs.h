@@ -27,11 +27,12 @@
 #include <iosfwd>      // for istream
 #include <string>      // for string, basic_string
 
+// FIXME: rule of 5
 class ZimCreatorFS : public zim::writer::Creator
 {
  public:
   ZimCreatorFS(std::string _directoryPath);
-  virtual ~ZimCreatorFS() = default;
+  ~ZimCreatorFS() override = default;
 
   virtual void add_redirectArticles_from_file(const std::string& path);
   virtual void visitDirectory(const std::string& path);
@@ -40,8 +41,11 @@ class ZimCreatorFS : public zim::writer::Creator
 
   void processSymlink(const std::string& curdir,
                       const std::string& symlink_path);
-  const std::string& basedir() const { return directoryPath; }
-  const std::string& canonicalBaseDir() const { return canonical_basedir; }
+  [[nodiscard]] const std::string& basedir() const { return directoryPath; }
+  [[nodiscard]] const std::string& canonicalBaseDir() const
+  {
+    return canonical_basedir;
+  }
   std::string parseAndAdaptHtml(std::string& data,
                                 std::string& title,
                                 const std::string& url);

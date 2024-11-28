@@ -30,7 +30,7 @@ namespace zim
 
 class Metadata
 {
-  typedef std::map<std::string, std::string> KeyValueMap;
+  using KeyValueMap = std::map<std::string, std::string>;
 
  public:  // types
   struct ReservedMetadataRecord {
@@ -41,35 +41,35 @@ class Metadata
     const std::string regex;
   };
 
-  typedef std::vector<ReservedMetadataRecord> ReservedMetadataTable;
+  using ReservedMetadataTable = std::vector<ReservedMetadataRecord>;
 
-  typedef std::vector<std::string> Errors;
+  using Errors = std::vector<std::string>;
 
-  typedef KeyValueMap::const_iterator Iterator;
+  using Iterator = KeyValueMap::const_iterator;
 
- public:  // data
+  // data
   static const ReservedMetadataTable& reservedMetadataInfo;
 
- public:  // functions
+  // functions
   void set(const std::string& name, const std::string& value);
-  bool has(const std::string& name) const;
+  [[nodiscard]] bool has(const std::string& name) const;
   const std::string& operator[](const std::string& name) const;
 
-  bool valid() const;
-  Errors check() const;
+  [[nodiscard]] bool valid() const;
+  [[nodiscard]] Errors check() const;
 
   static const ReservedMetadataRecord& getReservedMetadataRecord(
       const std::string& name);
 
-  Iterator begin() const { return data.begin(); }
-  Iterator end() const { return data.end(); }
+  [[nodiscard]] Iterator begin() const { return data.begin(); }
+  [[nodiscard]] Iterator end() const { return data.end(); }
 
  private:  // functions
-  Errors checkMandatoryMetadata() const;
-  Errors checkSimpleConstraints() const;
-  Errors checkComplexConstraints() const;
+  [[nodiscard]] Errors checkMandatoryMetadata() const;
+  [[nodiscard]] Errors checkSimpleConstraints() const;
+  [[nodiscard]] Errors checkComplexConstraints() const;
 
- private:  // data
+  // data
   KeyValueMap data;
 };
 

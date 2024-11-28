@@ -17,21 +17,22 @@
  * MA 02110-1301, USA.
  */
 
-#ifndef _ZIM_TOOL_VERSION_H_
-#define _ZIM_TOOL_VERSION_H_
+#ifndef ZIM_TOOL_VERSION_H_
+#define ZIM_TOOL_VERSION_H_
 
-#include <iostream>
+#include <iostream> // requires transitive include. Need to fix in libzim.
 
 #include <zim/version.h>
 
 #ifndef VERSION
-  #define VERSION "undefined"
+#define VERSION "undefined"
 #endif
 
-void printVersions(std::ostream& out = std::cout) {
-  out << "zim-tools " << VERSION << std::endl;
-  out << std::endl;
+inline void printVersions(std::ostream& out = std::cout)
+{
+  out << "zim-tools " << VERSION << '\n';
+  out << '\n';
   zim::printVersions(out);
 }
 
-#endif //_ZIM_TOOL_VERSION_H_
+#endif  // ZIM_TOOL_VERSION_H_

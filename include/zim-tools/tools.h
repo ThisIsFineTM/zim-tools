@@ -34,7 +34,6 @@
 #include <string_view>  // for string_view
 #include <utility>      // for move, forward, pair
 #include <vector>       // for vector
-#include <utility>
 
 /* Formatter for std::exception what() message:
  * throw std::runtime_error(
@@ -157,10 +156,7 @@ class ItemProvider : public zim::writer::ContentProvider
   ItemProvider(const ItemProvider&) = default;
   ItemProvider(ItemProvider&&) noexcept = default;
 
-  ItemProvider(zim::Item item) noexcept
-      : Parent_t(), item_(std::move(item)), feeded_(false)
-  {
-  }
+  ItemProvider(zim::Item item) noexcept : Parent_t(), item_(std::move(item)) {}
 
   ItemProvider& operator=(const ItemProvider&) = default;
   ItemProvider& operator=(ItemProvider&&) noexcept = default;
@@ -175,7 +171,7 @@ class ItemProvider : public zim::writer::ContentProvider
   zim::Blob feed() override
   {
     if (feeded_) {
-      return zim::Blob();
+      return {};
     }
     feeded_ = true;
     return item_.getData();
@@ -304,7 +300,7 @@ std::string httpRedirectHtml(std::string_view redirectUrl);
 template <typename T, typename... Args>
 constexpr bool is_any_of(T&& lhs, Args&&... args) noexcept
 {
-    return ((std::forward<T>(lhs) == std::forward<Args>(args)) || ...);
+  return ((std::forward<T>(lhs) == std::forward<Args>(args)) || ...);
 }
 
 #endif  //  OPENZIM_TOOLS_H

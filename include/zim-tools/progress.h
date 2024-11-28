@@ -18,68 +18,66 @@
  * MA 02110-1301, USA.
  */
 
-#ifndef _ZIM_TOOL_PROGRESS_H_
-#define _ZIM_TOOL_PROGRESS_H_
+#ifndef ZIM_TOOL_PROGRESS_H_
+#define ZIM_TOOL_PROGRESS_H_
 
+#include <atomic>
 #include <chrono>
 #include <iostream>
-#include <atomic>
 #include <mutex>
 
 using TimePoint = std::chrono::system_clock::time_point;
 
-class ProgressBar //Class for implementing a progress bar(used in redundancy, url and MIME checks).
+class ProgressBar  // Class for implementing a progress bar(used in redundancy,
+                   // url and MIME checks).
 {
-private:
-    double time_interval; // The time interval a report will be printed.
-    TimePoint last_report_time; // Last time a report has been printed.
-    int max_no;     //Maximum no of times report() will be called.
-    std::atomic<int> counter;    //Number of times report() has been called(at a particular time).
-    bool report_progress; //Boolean value to store wether report should display any characters.
-    std::mutex mutex;
+ private:
+  double time_interval{1};       // The time interval a report will be printed.
+  TimePoint last_report_time;  // Last time a report has been printed.
+  int max_no{0};                 // Maximum no of times report() will be called.
+  std::atomic<int> counter{0};  // Number of times report() has been called(at a
+                                // particular time).
+  bool report_progress{false};  // Boolean value to store wether report should
+                                // display any characters.
+  std::mutex mutex;
 
-public:
-    ProgressBar(double time_interval)
-      : time_interval(time_interval),
-        max_no(0),
-        counter(0),
-        report_progress(false)
-    { }
+ public:
+  ProgressBar(double time_interval) : time_interval(time_interval) {}
 
-    void reset(int max_n)
-    {
-        max_no = max_n;
-        counter=0;
-        last_report_time=TimePoint();
-        time_interval=1;
+  void reset(int max_n)
+  {
+    max_no = max_n;
+    counter = 0;
+    last_report_time = TimePoint();
+    time_interval = 1;
+  }
+
+  void report()
+  {
+    if (counter >= max_no) {
+      return;
     }
 
-    void report()
-    {
-        if(counter >= max_no)
-            return;
+    counter++;
 
-        counter++;
-
-        if(!report_progress)
-            return;
-
-        std::unique_lock<std::mutex> lock(mutex);
-        auto now = std::chrono::system_clock::now();
-        std::chrono::duration<double> duration = now-last_report_time;
-        if (duration.count() > time_interval) {
-            std::cout << "\r" << counter << "/" << max_no << std::flush;
-            last_report_time = now;
-        }
-        if(counter == max_no)
-        {
-            std::cout << "\r" << counter << "/" << max_no << std::endl;
-        }
+    if (!report_progress) {
+      return;
     }
 
-    void set_progress_report(bool report=true) {
-        report_progress = report;
+    std::unique_lock<std::mutex> const lock(mutex);
+    auto now = std::chrono::system_clock::now();
+    std::chrono::duration<double> const duration = now - last_report_time;
+
+    if (duration.count() > time_interval) {
+      std::cout << "\r" << counter << "/" << max_no << std::flush;
+      last_report_time = now;
     }
+    if (counter == max_no) {
+      std::cout << "\r" << counter << "/" << max_no << '\n';
+    }
+  }
+
+  void set_progress_report(bool report = true) { report_progress = report; }
 };
 
-#endif //_ZIM_TOOL_PROGRESS_H_
+#endif  // ZIM_TOOL_PROGRESS_H_

@@ -23,6 +23,7 @@
 
 #include <gumbo.h>  // for GumboVector
 
+#include <string>
 #include <string_view>  // for string_view
 
 [[nodiscard]]

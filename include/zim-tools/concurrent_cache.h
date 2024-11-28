@@ -20,8 +20,10 @@
 #ifndef ZIM_CONCURRENT_CACHE_H
 #define ZIM_CONCURRENT_CACHE_H
 
-#include "lrucache.h"
+#include <zim-tools/lrucache.h>
 
+#include <cstddef> // size_t
+#include <exception>
 #include <future>
 #include <mutex>
 
@@ -40,14 +42,12 @@ namespace zim
 template <typename Key, typename Value>
 class ConcurrentCache
 {
-private: // types
-  typedef std::shared_future<Value> ValuePlaceholder;
-  typedef lru_cache<Key, ValuePlaceholder> Impl;
+ private:  // types
+  using ValuePlaceholder = std::shared_future<Value>;
+  using Impl = lru_cache<Key, ValuePlaceholder>;
 
-public: // types
-  explicit ConcurrentCache(size_t maxEntries)
-    : impl_(maxEntries)
-  {}
+ public:  // types
+  explicit ConcurrentCache(size_t maxEntries) : impl_(maxEntries) {}
 
   // Gets the entry corresponding to the given key. If the entry is not in the
   // cache, it is obtained by calling f() (without any arguments) and the
@@ -58,14 +58,14 @@ public: // types
   // of the missing element takes a long time, only attempts to access that
   // element will block - the rest of the cache remains open to concurrent
   // access.
-  template<class F>
+  template <class F>
   Value getOrPut(const Key& key, F f)
   {
     std::promise<Value> valuePromise;
     std::unique_lock<std::mutex> l(lock_);
     const auto x = impl_.getOrPut(key, valuePromise.get_future().share());
     l.unlock();
-    if ( x.miss() ) {
+    if (x.miss()) {
       try {
         valuePromise.set_value(f());
       } catch (std::exception& e) {
@@ -79,12 +79,12 @@ public: // types
     return x.value().get();
   }
 
-private: // data
+ private:  // data
   Impl impl_;
   std::mutex lock_;
 };
 
-} // namespace zim
+}  // namespace zim
 
-#endif // ZIM_CONCURRENT_CACHE_H
+#endif  // ZIM_CONCURRENT_CACHE_H
 

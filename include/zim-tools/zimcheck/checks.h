@@ -1,5 +1,5 @@
-#ifndef _ZIM_TOOL_ZIMFILECHECKS_H_
-#define _ZIM_TOOL_ZIMFILECHECKS_H_
+#ifndef ZIM_TOOL_ZIMFILECHECKS_H_
+#define ZIM_TOOL_ZIMFILECHECKS_H_
 
 #include <zim-tools/zimcheck/json_tools.h>  // for OutputStream, property
 //
@@ -15,7 +15,7 @@ class ProgressBar;
 namespace zim
 {
 class Archive;
-}
+}  // namespace zim
 
 enum StatusCode : int { PASS = 0, FAIL = 1, EXCEPTION = 2 };
 
@@ -39,14 +39,18 @@ enum class TestType {
 
 class EnabledTests
 {
-  std::bitset<size_t(TestType::COUNT)> tests;
+  std::bitset<static_cast<size_t>(TestType::COUNT)> tests;
 
  public:
-  EnabledTests() {}
+  EnabledTests() = default;
 
   void enableAll() { tests.set(); }
-  void enable(TestType tt) { tests.set(size_t(tt)); }
-  bool isEnabled(TestType tt) const { return tests[size_t(tt)]; }
+  void enable(TestType tt) { tests.set(static_cast<size_t>(tt)); }
+
+  [[nodiscard]] bool isEnabled(TestType tt) const
+  {
+    return tests[static_cast<size_t>(tt)];
+  }
 };
 
 enum class MsgId {
@@ -68,6 +72,7 @@ using MsgParams = kainjow::mustache::object;
 JSON::OutputStream& operator<<(JSON::OutputStream& out, TestType check);
 JSON::OutputStream& operator<<(JSON::OutputStream& out, EnabledTests checks);
 
+// TODO rule of 5
 class ErrorLogger
 {
  private:
@@ -80,7 +85,7 @@ class ErrorLogger
   std::vector<std::vector<MsgIdWithParams>> reportMsgs;
 
   // testStatus[i] corresponds to the status of i'th test
-  std::bitset<size_t(TestType::COUNT)> testStatus;
+  std::bitset<static_cast<size_t>(TestType::COUNT)> testStatus;
 
   mutable JSON::OutputStream jsonOutputStream;
 
