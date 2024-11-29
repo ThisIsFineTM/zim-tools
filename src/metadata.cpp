@@ -21,15 +21,18 @@
 //
 #include <unicode/stringpiece.h>  // for StringPiece
 #include <unicode/unistr.h>       // for UnicodeString
-#include <unicode/uversion.h>     // for icu
 //
-#include <cctype>     // for isprint
-#include <cstdint>    // for int32_t
-#include <iomanip>    // for operator<<, setfill, setw
+#include <cctype>  // for isprint
+#include <cstddef>
+#include <cstdint>  // for int32_t
+#include <iomanip>  // for operator<<, setfill, setw
+#include <ios>
 #include <regex>      // for regex_search, regex
 #include <sstream>    // for basic_ostringstream, basic_ostream
 #include <stdexcept>  // for out_of_range
-#include <utility>    // for pair
+#include <string>
+#include <string_view>
+#include <utility>  // for pair
 
 namespace zim
 {
@@ -37,20 +40,20 @@ namespace zim
 namespace
 {
 
-const bool MANDATORY = true;
-const bool OPTIONAL = false;
+constexpr bool MANDATORY = true;
+constexpr bool OPTIONAL = false;
 
 const std::string LANGS_REGEXP = "^\\w{3}(,\\w{3})*$";
 const std::string DATE_REGEXP = R"(^\d\d\d\d-\d\d-\d\d$)";
 const std::string PNG_REGEXP = "^\x89\x50\x4e\x47\x0d\x0a\x1a\x0a";
 
-bool searchRegex(const std::string& regexStr, const std::string& text)
+bool searchRegex(const std::string& regexStr, const std::string_view text)
 {
   const std::regex regex(regexStr);
-  return std::regex_search(text.begin(), text.end(), regex);
+  return std::regex_search(text.cbegin(), text.cend(), regex);
 }
 
-size_t getTextLength(const std::string& utf8EncodedString)
+size_t getTextLength(const std::string_view utf8EncodedString)
 {
   // For some unknown reason implicite convertion from std::string to
   // icu::StringPiece is broken on Windows. Constructors are definde in
@@ -65,8 +68,10 @@ size_t getTextLength(const std::string& utf8EncodedString)
   // (wrong ptr) and using second one works. Don't ask me why This is broken
   // icu::StringPiece stringPiece(utf8EncodedString);
   // This is not
-  icu::StringPiece stringPiece(utf8EncodedString.data(),
-                               static_cast<int32_t>(utf8EncodedString.size()));
+  icu::StringPiece const stringPiece(
+      utf8EncodedString.data(), 
+      static_cast<int32_t>(utf8EncodedString.size()));
+
   return icu::UnicodeString::fromUTF8(stringPiece).length();
 }
 
@@ -76,7 +81,7 @@ class MetadataComplexCheckBase
   const std::string description;
   const MetadataComplexCheckBase* const prev;
 
- public:  // functions
+  // functions
   explicit MetadataComplexCheckBase(const std::string& desc);
 
   MetadataComplexCheckBase(const MetadataComplexCheckBase&) = delete;
@@ -86,7 +91,7 @@ class MetadataComplexCheckBase
 
   virtual ~MetadataComplexCheckBase();
 
-  virtual bool checkMetadata(const Metadata& m) const = 0;
+  [[nodiscard]] virtual bool checkMetadata(const Metadata& m) const = 0;
 
   static const MetadataComplexCheckBase* getLastCheck() { return last; }
 
@@ -112,7 +117,7 @@ MetadataComplexCheckBase::~MetadataComplexCheckBase()
 }
 
 #define ADD_METADATA_COMPLEX_CHECK(DESC, CLSNAME)            \
-  class CLSNAME : public MetadataComplexCheckBase            \
+  class CLSNAME : public MetadataComplexCheckBase           \
   {                                                          \
    public:                                                   \
     CLSNAME() : MetadataComplexCheckBase(DESC) {}            \
@@ -136,12 +141,12 @@ MetadataComplexCheckBase::~MetadataComplexCheckBase()
 // characters.
 // In a general purpose/rigorous version we should escape the escape symbol
 // (backslash) too, but that doesn't play well with the purpose stated above.
-std::string escapeNonPrintableChars(const std::string& s)
+std::string escapeNonPrintableChars(const std::string_view s)
 {
   std::ostringstream os;
   os << std::hex;
   for (const char c : s) {
-    if (std::isprint(static_cast<unsigned char>(c))) {
+    if (std::isprint(static_cast<unsigned char>(c)) != 0) {
       os << c;
     } else {
       const unsigned int charVal = static_cast<unsigned char>(c);
@@ -166,14 +171,15 @@ const Metadata::ReservedMetadataRecord& Metadata::getReservedMetadataRecord(
     const std::string& name)
 {
   for (const auto& x : reservedMetadataInfo) {
-    if (x.name == name)
+    if (x.name == name) {
       return x;
+    }
   }
 
   throw std::out_of_range(name + " is not a reserved metadata name");
 }
 
-bool Metadata::has(const std::string& name) const
+bool Metadata::has(const std::string_view name) const
 {
   return data.find(name) != data.end();
 }
@@ -183,9 +189,9 @@ const std::string& Metadata::operator[](const std::string& name) const
   return data.at(name);
 }
 
-void Metadata::set(const std::string& name, const std::string& value)
+void Metadata::set(const std::string& name, std::string value)
 {
-  data[name] = value;
+  data[name] = std::move(value);
 }
 
 bool Metadata::valid() const
@@ -208,9 +214,7 @@ Metadata::Errors Metadata::checkMandatoryMetadata() const
 Metadata::Errors Metadata::checkSimpleConstraints() const
 {
   Errors errors;
-  for (const auto& nv : data) {
-    const auto& name = nv.first;
-    const auto& value = nv.second;
+  for (const auto& [name,value] : data) {
     try {
       const auto& rmr = getReservedMetadataRecord(name);
       if (rmr.minLength != 0 && getTextLength(value) < rmr.minLength) {
@@ -252,8 +256,9 @@ Metadata::Errors Metadata::check() const
 {
   const Errors e1 = checkMandatoryMetadata();
   const Errors e2 = checkSimpleConstraints();
-  if (!e1.empty() || !e2.empty())
+  if (!e1.empty() || !e2.empty()) {
     return concat(e1, e2);
+  }
 
   return checkComplexConstraints();
 }

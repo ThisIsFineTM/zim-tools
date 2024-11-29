@@ -20,19 +20,22 @@
 
 #include <zim-tools/tools.h>
 
-#include <algorithm>    // for any_of, count, find, min, mismatch, transform
-#include <array>        // for array
-#include <cctype>       // for isxdigit, isalnum, tolower
-#include <cstdio>       // for sscanf
-#include <cstring>      // for strncmp
-#include <filesystem>   // for path, exists, is_directory, operator/
-#include <iomanip>      // for operator<<, setw
-#include <iterator>     // for back_insert_iterator, back_inserter, next
-#include <map>          // for map, operator==
-#include <optional>     // for optional, nullopt, nullopt_t
-#include <sstream>      // for basic_ostringstream, basic_ostream, basic_ist...
+#include <algorithm>   // for any_of, count, find, min, mismatch, transform
+#include <array>       // for array
+#include <cctype>      // for isxdigit, isalnum, tolower
+#include <cstdio>      // for sscanf
+#include <cstring>     // for strncmp
+#include <filesystem>  // for path, exists, is_directory, operator/
+#include <iomanip>     // for operator<<, setw
+#include <ios>
+#include <iterator>  // for back_insert_iterator, back_inserter, next
+#include <map>       // for map, operator==
+#include <optional>  // for optional, nullopt, nullopt_t
+#include <sstream>   // for basic_ostringstream, basic_ostream, basic_ist...
+#include <string>
 #include <string_view>  // for string_view, basic_string_view, operator<=>
-#include <vector>       // for vector
+#include <utility>
+#include <vector>  // for vector
 
 // #ifdef _WIN32
 ////constexpr std::string_view SEPARATOR{R"(\\)"};
@@ -68,7 +71,7 @@ std::string base64_encode(unsigned char const* bytes_to_encode, size_t in_len)
   std::array<unsigned char, 3> char_array_3{};
   std::array<unsigned char, 4> char_array_4{};
 
-  while (in_len--) {
+  while ((in_len--) != 0u) {
     char_array_3[i++] = *(bytes_to_encode++);
     if (i == 3) {
       char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
@@ -85,7 +88,7 @@ std::string base64_encode(unsigned char const* bytes_to_encode, size_t in_len)
     }
   }
 
-  if (i) {
+  if (i != 0u) {
     for (j = i; j < 3; j++) {
       char_array_3[j] = '\0';
     }
@@ -112,9 +115,9 @@ std::string base64_encode(unsigned char const* bytes_to_encode, size_t in_len)
 static char charFromHex(const std::string& a)
 {
   std::istringstream Blat(a);
-  int Z;
+  int Z = 0;
   Blat >> std::hex >> Z;
-  return char(Z);
+  return static_cast<char>(Z);
 }
 
 std::string decodeUrl(std::string_view originalUrl)
@@ -124,7 +127,8 @@ std::string decodeUrl(std::string_view originalUrl)
 
   while ((pos = url.find('%', pos)) != std::string::npos
          && pos + 2 < url.length()) {
-    if (!std::isxdigit(url[pos + 1]) || !std::isxdigit(url[pos + 2])) {
+    if ((std::isxdigit(url[pos + 1]) == 0)
+        || (std::isxdigit(url[pos + 2]) == 0)) {
       ++pos;
       continue;
     }
@@ -141,9 +145,9 @@ namespace
 std::vector<std::string> split(std::string_view str, char delim)
 {
   std::vector<std::string> result;
-  auto start = str.cbegin();
+  const auto* start = str.cbegin();
   while (true) {
-    const auto end = std::find(start, str.cend(), delim);
+    const auto* const end = std::find(start, str.cend(), delim);
 
     result.emplace_back(start, end);
     if (end == str.cend()) {
@@ -165,6 +169,12 @@ std::string getRelativePath(std::string_view basePath,
   auto x = std::mismatch(b.cbegin(), b.cbegin() + l, t.cbegin());
 
   const size_t ups = (b.cend() - x.first) + (x.second == t.cend());
+  //const size_t ups
+  //    = (b.cend() - x.first)
+  //      + static_cast<typename __normal_iterator<
+  //          const class basic_string<char>*,
+  //          class vector<class basic_string<char>>>::difference_type>(
+  //          x.second == t.cend());
 
   std::string r;
 
@@ -194,7 +204,8 @@ std::string computeRelativePath(std::string_view basePath,
       return std::string{"./"};
     }
 
-    std::string_view strippedPath{targetPath.substr(0, targetPath.size() - 1)};
+    std::string_view const strippedPath{
+        targetPath.substr(0, targetPath.size() - 1)};
 
     return getRelativePath(basePath, strippedPath) + '/';
   }
@@ -239,8 +250,6 @@ void replaceStringInPlace(std::string& subject,
     subject.replace(pos, search.length(), replace);
     pos += replace.length();
   }
-
-  return;
 }
 
 void stripTitleInvalidChars(std::string& str)
@@ -272,7 +281,7 @@ std::optional<const std::string_view> getHtmlEntity(const std::string_view core)
 template <typename Itr>
 std::string_view make_sv(Itr start, Itr end)
 {
-    return std::string_view(start, std::distance(start, end));
+  return std::string_view(start, std::distance(start, end));
 }
 
 }  // unnamed namespace
@@ -281,8 +290,8 @@ std::string decodeHtmlEntities(std::string_view str)
 {
   std::string result;
 
-  auto p = str.cbegin();
-  auto start = str.cend();
+  const auto* p = str.cbegin();
+  const auto* start = str.cend();
 
   for (; p != str.cend(); ++p) {
     if (*p == '&') {
@@ -317,7 +326,7 @@ std::vector<html_link> generic_getLinks(std::string_view page)
   std::vector<html_link> links;
   std::string attr;
 
-  while (*p) {
+  while (*p != 0) {
     if (std::strncmp(p, " href", 5) == 0) {
       attr = "href";
       p += 5;
@@ -338,7 +347,7 @@ std::vector<html_link> generic_getLinks(std::string_view page)
     while (*p == ' ') {
       p += 1;
     }
-    char delimiter = *p++;
+    char const delimiter = *p++;
     if (delimiter != '\'' && delimiter != '"') {
       continue;
     }
@@ -349,8 +358,7 @@ std::vector<html_link> generic_getLinks(std::string_view page)
     while (*p != delimiter) {
       p++;
     }
-    links.push_back(
-        html_link(attr, decodeHtmlEntities(make_sv(linkStart, p))));
+    links.emplace_back(attr, decodeHtmlEntities(make_sv(linkStart, p)));
     p += 1;
   }
   return links;
@@ -404,7 +412,7 @@ std::string normalize_link(const std::string_view input,
 
   bool check_rel = false;
   // const char* p = input.c_str();
-  auto p = input.cbegin();
+  const auto* p = input.cbegin();
   if (*(p) == '/') {
     // This is an absolute url.
     p++;
@@ -430,7 +438,7 @@ std::string normalize_link(const std::string_view input,
 
         // Remove the last part.
         const size_t pos = output.find_last_of('/');
-        output.resize(pos == output.npos ? 0 : pos);
+        output.resize(pos == std::string::npos ? 0 : pos);
 
         // Move after the "..".
         p += 2;
@@ -453,7 +461,7 @@ std::string normalize_link(const std::string_view input,
     }
 
     if (*p == '%') {
-      unsigned char ch;
+      unsigned char ch = 0;
       sscanf(p + 1, "%2hhx", &ch);  // hhx only supports hex unsigned char
       output += ch;
       p += 3;
@@ -506,9 +514,8 @@ UriKind html_link::detectUriKind(std::string_view input_string) noexcept
     if (k == 0 && input_string.size() > 1
         && input_string.substr(0, 2) == uriProtocolRelativeDelimeter) {
       return UriKind::PROTOCOL_RELATIVE;
-    } else {
-      return UriKind::OTHER;
     }
+    return UriKind::OTHER;
   }
 
   if (k + 2 < input_string.size() && input_string[k + 1] == '/'
@@ -530,7 +537,7 @@ UriKind html_link::detectUriKind(std::string_view input_string) noexcept
 namespace
 {
 
-static bool isReservedUrlChar(char c) noexcept
+bool isReservedUrlChar(char c) noexcept
 {
   constexpr static std::array<char, 10> reserved
       = {{';', ',', '?', ':', '@', '&', '=', '+', '$'}};
@@ -541,7 +548,7 @@ static bool isReservedUrlChar(char c) noexcept
 
 bool needsEscape(const char c, const bool encodeReserved)
 {
-  if (std::isalnum(c)) {
+  if (std::isalnum(c) != 0) {
     return false;
   }
 

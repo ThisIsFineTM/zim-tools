@@ -21,8 +21,10 @@
 #define OPENZIM_METADATA_H
 
 #include <cstddef>  // for size_t
+#include <functional>
 #include <map>      // for map
 #include <string>   // for basic_string, string, operator<=>
+#include <string_view> 
 #include <vector>   // for vector
 
 namespace zim
@@ -30,7 +32,7 @@ namespace zim
 
 class Metadata
 {
-  using KeyValueMap = std::map<std::string, std::string>;
+  using KeyValueMap = std::map<std::string, std::string, std::less<>>;
 
  public:  // types
   struct ReservedMetadataRecord {
@@ -51,8 +53,10 @@ class Metadata
   static const ReservedMetadataTable& reservedMetadataInfo;
 
   // functions
-  void set(const std::string& name, const std::string& value);
-  [[nodiscard]] bool has(const std::string& name) const;
+  void set(const std::string& name, std::string value);
+
+  [[nodiscard]] bool has(const std::string_view name) const;
+
   const std::string& operator[](const std::string& name) const;
 
   [[nodiscard]] bool valid() const;
